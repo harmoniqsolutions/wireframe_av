@@ -220,18 +220,25 @@ packages/db/prisma/seed.ts
 It creates:
 
 - Default dev org/user
-- Common connector types
-- Common signal types
+- Common connector types (including DM 8G, 3-pin IR, Cresnet 4-pin)
+- Common signal types (including DigitalMedia (DM), IR Control, Cresnet)
 - Common cable types
-- Generic manufacturer
-- Sample product templates:
+- Generic manufacturer + sample product templates:
   - Generic DSP
   - Generic Amplifier
   - Generic Network Switch
   - Generic HDMI Display
   - Generic Wireless Microphone Receiver
+- Crestron manufacturer (website linked) + 4 product templates (status: `AI_DRAFT`, sourced from EasySchematic open-source library):
+  - CP4N — 4-Series Control Processor (1U rack)
+  - DM-NVX-351 — AV-over-IP encoder/decoder
+  - DM-MD8X8-CPU3 — 8×8 modular matrix switcher (4U)
+  - DM-MD16X16-CPU3 — 16×16 modular matrix switcher (7U)
 
-The user plans to have another chatbot generate a Biamp equipment list to add to the database/library. Expect future work to import or seed more manufacturer product templates and ports. The UI now includes product library filters so a bigger library stays usable.
+Expect future work to import or seed more manufacturer product templates and ports. The UI now includes product library filters so a bigger library stays usable. The EasySchematic open-source repo (https://github.com/duremovich/EasySchematic) was evaluated as a data source — it has only 4 Crestron devices total.
+
+**IMPORTANT — Product Data Accuracy Policy:**
+Do NOT guess or hallucinate product specifications. All field values (dimensions, weight, power, port counts, connector types, referenceUrl, etc.) must be taken directly from the manufacturer's official website or published datasheets. If a spec cannot be confirmed from a primary source, leave the field null rather than approximate it. The `verificationStatus` field communicates provenance: use `AI_DRAFT` only when the data was sourced from a structured third-party dataset (e.g. EasySchematic), and flag anything unverified for human review.
 
 ## Product Library Status
 
@@ -247,6 +254,23 @@ Product Library supports:
 - Verification status
 - Product filters by search, manufacturer, category, verification status
 
+`ProductTemplate` schema fields (as of 2026-05-03):
+
+| Field | Type | Notes |
+|---|---|---|
+| `rackUnits` | `Int?` | Rack height in U |
+| `widthInches` | `Float?` | Chassis width |
+| `depthInches` | `Float?` | Chassis depth |
+| `heightInches` | `Float?` | Chassis height (use for non-rack items) |
+| `weightLbs` | `Float?` | Weight in lbs (US AV industry standard) |
+| `powerWatts` | `Float?` | Typical power consumption |
+| `thermalBtuH` | `Float?` | Manual override; derive as `powerWatts * 3.412` if null |
+| `poeBudgetW` | `Float?` | PoE supply capacity (switches/injectors) |
+| `poeDrawW` | `Float?` | PoE draw (powered devices) |
+| `unitCostUsd` | `Float?` | Unit cost for budget estimation |
+| `referenceUrl` | `String?` | Manufacturer product page URL |
+| `imageUrl` | `String?` | Product image URL |
+
 Product port editor supports:
 
 - Name
@@ -260,7 +284,8 @@ Product port editor supports:
 
 Important next opportunities:
 
-- Import/seed robust manufacturer equipment libraries, starting with Biamp.
+- Import/seed robust manufacturer equipment libraries (Biamp, QSC, Extron, etc.) using AI-generated data.
+- Expose new `ProductTemplate` fields (weight, dimensions, power, cost, referenceUrl) in the product library UI and rack elevation totals.
 - Add product template duplicate/copy.
 - Add product port bulk edit and better grouped port display.
 - Add verification metadata and provenance for AI/admin/user verified templates.
@@ -455,7 +480,8 @@ Important files:
 
 Important next opportunities:
 
-- Rack power/weight totals using `ProductTemplate.powerWatts`
+- Rack power/weight totals using `ProductTemplate.powerWatts` and `ProductTemplate.weightLbs`
+- Rack thermal load summary using `thermalBtuH` (or derived from `powerWatts * 3.412`)
 - Space utilization indicator (used RU / total RU)
 - Rack PDF/print export
 - Display rack location and link to project locations
@@ -527,19 +553,21 @@ The repo currently uses `prisma db push` rather than migrations. For production,
 
 High-value next passes:
 
-1. Import/seed Biamp product templates and ports.
-2. Create a structured equipment import format, likely JSON or CSV, so AI-generated manufacturer data can be reviewed and imported.
-3. Move hardcoded connector/signal compatibility into data-driven rules.
-4. Add custom termination metadata to cables for XLR-to-Euroblock and similar field wiring.
-5. Add tag auto-numbering and device edit forms.
-6. Improve schematic route UX:
+1. ~~Import/seed initial Crestron product templates.~~ Done (4 devices: CP4N, DM-NVX-351, DM-MD8X8-CPU3, DM-MD16X16-CPU3).
+2. Import/seed Biamp product templates and ports — specs must come from Biamp's official website/datasheets, not guessed.
+3. Create a structured equipment import format, likely JSON or CSV, so manufacturer data can be reviewed and imported before seeding.
+4. Move hardcoded connector/signal compatibility into data-driven rules.
+5. Add custom termination metadata to cables for XLR-to-Euroblock and similar field wiring.
+6. Add tag auto-numbering and device edit forms.
+7. Expose new ProductTemplate fields (referenceUrl, weightLbs, powerWatts, unitCostUsd) in product library UI.
+8. Improve schematic route UX:
    - Reset route
    - Multi-bend route points
    - Better selection affordances
    - Edge label placement control
-7. ~~Add rack elevation MVP using existing `Rack` and `RackMountedItem`.~~ Done.
-8. Add project revisions and changelog snapshots.
-9. Prepare deployment configuration for Vercel + Neon/Supabase.
+9. ~~Add rack elevation MVP using existing `Rack` and `RackMountedItem`.~~ Done.
+10. Add project revisions and changelog snapshots.
+11. Prepare deployment configuration for Vercel + Neon/Supabase.
 
 ## Agent Working Guidelines
 

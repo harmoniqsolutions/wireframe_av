@@ -195,8 +195,17 @@ model ProductTemplate {
   model              String
   category           String?
   rackUnits          Int?
+  widthInches        Float?
   depthInches        Float?
+  heightInches       Float?
+  weightLbs          Float?
   powerWatts         Float?
+  thermalBtuH        Float?
+  poeBudgetW         Float?
+  poeDrawW           Float?
+  unitCostUsd        Float?
+  referenceUrl       String?
+  imageUrl           String?
   notes              String?
   verificationStatus VerificationStatus    @default(MANUAL)
   createdAt          DateTime              @default(now())
