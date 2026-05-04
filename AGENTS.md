@@ -58,6 +58,7 @@ apps/web
     devices
     products
     projects
+    racks
     schematics
   lib
   stores
@@ -430,13 +431,37 @@ Design preferences:
 - Avoid marketing/landing-page treatment.
 - Schematic nodes should feel like clean engineering blocks.
 
+## Rack Elevations Status
+
+Implemented:
+
+- Create and delete racks per project (name, height in RU, numbering direction)
+- Drag devices from sidebar into RU slots on the rack elevation canvas
+- Drag placed devices to reposition within the rack
+- Remove devices from the rack via X button
+- Front/rear view toggle — each side maintains independent mounted items
+- Client-side and server-side overlap/conflict detection
+- Optimistic local state updates with rollback on API error
+- `BOTTOM_UP` (RU 1 at bottom) and `TOP_DOWN` (RU 1 at top) numbering directions
+- `rackUnits` from `ProductTemplate` auto-sets device height; defaults to 1U if unset
+- Status messages auto-dismiss after 3 seconds
+
+Important files:
+
+- `apps/web/features/racks/rack-canvas.tsx`
+- `apps/web/features/racks/actions.ts`
+- `apps/web/app/api/racks/[rackId]/items/route.ts`
+- `apps/web/app/api/rack-items/[itemId]/route.ts`
+
+Important next opportunities:
+
+- Rack power/weight totals using `ProductTemplate.powerWatts`
+- Space utilization indicator (used RU / total RU)
+- Rack PDF/print export
+- Display rack location and link to project locations
+- Consider drag image customization for clearer multi-RU device ghost
+
 ## Placeholder Features
-
-Racks:
-
-- Route exists.
-- DB models exist: `Rack`, `RackMountedItem`.
-- UI is placeholder only.
 
 Network diagrams:
 
@@ -512,7 +537,7 @@ High-value next passes:
    - Multi-bend route points
    - Better selection affordances
    - Edge label placement control
-7. Add rack elevation MVP using existing `Rack` and `RackMountedItem`.
+7. ~~Add rack elevation MVP using existing `Rack` and `RackMountedItem`.~~ Done.
 8. Add project revisions and changelog snapshots.
 9. Prepare deployment configuration for Vercel + Neon/Supabase.
 
