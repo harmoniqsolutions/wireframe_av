@@ -14,9 +14,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <Providers>
-          <div className="min-h-screen">
-            <header className="border-b border-neutral-200 bg-white">
-              <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+          <div className="flex h-screen flex-col overflow-hidden">
+            <header className="shrink-0 border-b border-neutral-200 bg-white">
+              <div className="flex h-14 w-full items-center justify-between px-4">
                 <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-neutral-950">
                   <CircuitBoard className="h-5 w-5" />
                   WireframeAV
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </nav>
               </div>
             </header>
-            {children}
+            <div className="min-h-0 flex-1 overflow-auto">{children}</div>
           </div>
         </Providers>
       </body>

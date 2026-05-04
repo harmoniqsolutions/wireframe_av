@@ -2,7 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -16,7 +16,7 @@ import {
   type Edge,
   type Node
 } from "@xyflow/react";
-import { Plus } from "lucide-react";
+import { Maximize2, Minimize2, Plus } from "lucide-react";
 import { useEditorStore } from "@/stores/editor-store";
 import { DeviceNode } from "./device-node";
 
@@ -42,6 +42,8 @@ function CanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const { message, setMessage } = useEditorStore();
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
@@ -121,9 +123,32 @@ function CanvasInner({
     }, 450);
   }, []);
 
+  const toggleFullscreen = useCallback(async () => {
+    if (!workspaceRef.current) return;
+
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    await workspaceRef.current.requestFullscreen();
+  }, []);
+
+  useEffect(() => {
+    function updateFullscreenState() {
+      setIsFullscreen(document.fullscreenElement === workspaceRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    return () => document.removeEventListener("fullscreenchange", updateFullscreenState);
+  }, []);
+
   return (
-    <div className="grid h-[720px] grid-cols-[260px_1fr] overflow-hidden rounded-md border border-neutral-200 bg-white">
-      <aside className="border-r border-neutral-200 bg-neutral-50 p-3">
+    <div
+      ref={workspaceRef}
+      className="grid h-full min-h-[520px] grid-cols-[280px_minmax(0,1fr)] overflow-hidden rounded-md border border-neutral-200 bg-white"
+    >
+      <aside className="min-h-0 overflow-auto border-r border-neutral-200 bg-neutral-50 p-3">
         <div className="mb-3">
           <h3 className="text-sm font-semibold text-neutral-950">Project Devices</h3>
         </div>
@@ -149,12 +174,20 @@ function CanvasInner({
           {!devices.length && <p className="text-sm text-neutral-500">Add project equipment before building schematics.</p>}
         </div>
       </aside>
-      <section className="relative">
+      <section className="relative min-h-0">
         {message && (
           <div className="absolute left-4 top-4 z-10 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 shadow-sm">
             {message}
           </div>
         )}
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="absolute right-4 top-4 z-10 inline-flex h-9 items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-800 shadow-sm transition hover:bg-neutral-100"
+        >
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+        </button>
         <ReactFlow
           nodes={nodes}
           edges={edges}

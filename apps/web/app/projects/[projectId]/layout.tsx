@@ -39,8 +39,8 @@ export default async function ProjectLayout({
   if (!project) notFound();
 
   return (
-    <main className="mx-auto grid max-w-7xl grid-cols-[248px_1fr] gap-6 px-6 py-6">
-      <aside className="h-fit rounded-md border border-neutral-200 bg-white p-3">
+    <main className="grid h-full min-h-0 w-full grid-cols-[260px_minmax(0,1fr)] gap-4 p-4">
+      <aside className="min-h-0 overflow-auto rounded-md border border-neutral-200 bg-white p-3">
         <div className="border-b border-neutral-200 px-2 pb-3">
           <p className="text-xs font-medium uppercase text-neutral-500">Project Workspace</p>
           <h1 className="mt-1 text-sm font-semibold text-neutral-950">{project.name}</h1>
@@ -67,7 +67,7 @@ export default async function ProjectLayout({
           ))}
         </nav>
       </aside>
-      <section>{children}</section>
+      <section className="min-h-0 overflow-auto">{children}</section>
     </main>
   );
 }
