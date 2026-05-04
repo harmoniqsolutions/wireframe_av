@@ -2,6 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BackgroundVariant,
@@ -19,7 +20,7 @@ import {
   type Edge,
   type Node
 } from "@xyflow/react";
-import { CirclePlus, Focus, Maximize2, Minimize2, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { CirclePlus, Focus, Maximize2, Minimize2, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import type { DiagramDeviceNodeData } from "@wireframe-av/diagram/src/diagramTypes";
 import { useEditorStore } from "@/stores/editor-store";
 import { DeviceNode, getDeviceNodeDimensions } from "./device-node";
@@ -44,6 +45,7 @@ type ContextMenu =
   | {
       kind: "node";
       nodeId: string;
+      deviceInstanceId: string;
       label: string;
       x: number;
       y: number;
@@ -59,11 +61,13 @@ type ContextMenu =
     };
 
 function CanvasInner({
+  projectId,
   drawingPageId,
   initialNodes,
   initialEdges,
   devices
 }: {
+  projectId: string;
   drawingPageId: string;
   initialNodes: Node[];
   initialEdges: Edge[];
@@ -79,6 +83,7 @@ function CanvasInner({
   const [deviceSearch, setDeviceSearch] = useState("");
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const { message, setMessage: setRawMessage } = useEditorStore();
+  const schematicReturnPath = `/projects/${projectId}/schematics?page=${drawingPageId}`;
 
   const setMessage = useCallback(
     (msg: string | null) => {
@@ -525,10 +530,11 @@ function CanvasInner({
           onPaneClick={() => setContextMenu(null)}
           onNodeContextMenu={(event, node) => {
             event.preventDefault();
-            const nodeData = node.data as { tag?: string; displayName?: string | null; productName?: string; productModel?: string };
+            const nodeData = node.data as DiagramDeviceNodeData;
             setContextMenu({
               kind: "node",
               nodeId: node.id,
+              deviceInstanceId: nodeData.deviceInstanceId,
               label: nodeData.tag ?? nodeData.displayName ?? nodeData.productName ?? "Device",
               x: event.clientX,
               y: event.clientY
@@ -608,6 +614,14 @@ function CanvasInner({
               </>
             ) : (
               <>
+                <Link
+                  href={`/projects/${projectId}/equipment/${contextMenu.deviceInstanceId}?returnTo=${encodeURIComponent(schematicReturnPath)}`}
+                  onClick={() => setContextMenu(null)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit equipment
+                </Link>
                 <button
                   type="button"
                   onClick={() => resetConnectedRoutes(contextMenu.nodeId)}

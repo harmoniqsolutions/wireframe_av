@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@wireframe-av/db";
 import { getCurrentContext } from "@/lib/context";
 
@@ -30,6 +31,11 @@ function revalidateProjectDevice(projectId: string, deviceInstanceId?: string) {
   for (const path of projectPaths(projectId, deviceInstanceId)) {
     revalidatePath(path);
   }
+}
+
+function projectReturnPath(projectId: string, formData: FormData) {
+  const returnTo = optionalText(formData.get("returnTo"));
+  return returnTo?.startsWith(`/projects/${projectId}/`) ? returnTo : null;
 }
 
 export async function addDeviceInstanceToProject(projectId: string, formData: FormData) {
@@ -85,6 +91,8 @@ export async function updateDeviceInstance(projectId: string, deviceInstanceId: 
   });
 
   revalidateProjectDevice(projectId, deviceInstanceId);
+  const returnTo = projectReturnPath(projectId, formData);
+  if (returnTo) redirect(returnTo);
 }
 
 export async function createDevicePortInstance(projectId: string, deviceInstanceId: string, formData: FormData) {
@@ -110,6 +118,8 @@ export async function createDevicePortInstance(projectId: string, deviceInstance
   });
 
   revalidateProjectDevice(projectId, deviceInstanceId);
+  const returnTo = projectReturnPath(projectId, formData);
+  if (returnTo) redirect(returnTo);
 }
 
 export async function updateDevicePortInstance(projectId: string, deviceInstanceId: string, portId: string, formData: FormData) {
@@ -129,9 +139,11 @@ export async function updateDevicePortInstance(projectId: string, deviceInstance
   });
 
   revalidateProjectDevice(projectId, deviceInstanceId);
+  const returnTo = projectReturnPath(projectId, formData);
+  if (returnTo) redirect(returnTo);
 }
 
-export async function deleteDevicePortInstance(projectId: string, deviceInstanceId: string, portId: string) {
+export async function deleteDevicePortInstance(projectId: string, deviceInstanceId: string, portId: string, formData: FormData) {
   await getCurrentContext();
   await prisma.$transaction(async (tx) => {
     const connectedCables = await tx.cable.findMany({
@@ -150,6 +162,8 @@ export async function deleteDevicePortInstance(projectId: string, deviceInstance
   });
 
   revalidateProjectDevice(projectId, deviceInstanceId);
+  const returnTo = projectReturnPath(projectId, formData);
+  if (returnTo) redirect(returnTo);
 }
 
 export async function deleteDeviceInstance(projectId: string, deviceInstanceId: string) {

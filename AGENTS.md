@@ -309,6 +309,7 @@ Equipment page supports:
 - Add, edit, and delete project-specific snapshot ports on existing equipment
 - Device port edits detach the snapshot from the original `ProductPortTemplate` by clearing `productPortTemplateId`
 - Deleting a device or project-specific port deletes connected `Cable` rows first, which cascades linked schematic `DrawingEdge` rows
+- Equipment detail accepts a project-local `returnTo` query parameter. When present, the top breadcrumb says "Back to Schematics", and equipment/port save/add/delete actions redirect back to that path after revalidation.
 
 Professional tag prefixes shown in UI:
 
@@ -359,7 +360,8 @@ Implemented:
 - Automatic routes prefer the minimum number of orthogonal bends, then shorter path length
 - Automatic routes avoid other device blocks using obstacle rectangles derived from the rendered device node dimensions
 - Legacy/simple route adjustment still supports `DrawingEdge.routeOffsetX/Y`
-- Right-clicking a device opens a context menu with reset connected routes, fit drawing, and remove from page actions
+- Right-clicking a device opens a context menu with edit equipment, reset connected routes, fit drawing, and remove from page actions
+- Edit equipment from the schematic context menu opens `/projects/[projectId]/equipment/[deviceInstanceId]` with a `returnTo` URL for the current schematic page, so equipment edits can return directly to the drawing sheet.
 - Removing a device from a schematic page deletes its connected page cables and drawing edges
 - Switching drawing pages now resets React Flow local state from server props, so manual browser refresh is no longer required after page changes
 - Schematic ports and cable edges are color-coded by signal type
@@ -394,6 +396,7 @@ UX improvements landed (2026-05-04):
 - Default automatic edge routes now run through an obstacle-aware orthogonal router that favors fewer bends before shorter distance and avoids other schematic device blocks.
 - Device node dimensions are exposed from `device-node.tsx` and reused by `schematic-canvas.tsx` so routing obstacles match rendered block sizes.
 - Device context menu supports reset connected routes, fit drawing, and remove from page.
+- Device context menu now includes Edit equipment, which routes to the equipment detail editor and preserves a return path back to the current schematic page after save/add/delete.
 - Page switching bug fixed by resyncing React Flow node/edge state when `drawingPageId` changes.
 - Signal metadata is passed through the diagram mapper so port handles/labels and edges can be color-coded by signal type.
 

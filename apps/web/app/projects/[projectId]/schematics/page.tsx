@@ -118,6 +118,7 @@ export default async function ProjectSchematicsPage({
       {drawingPage ? (
         <div className="min-h-0 flex-1">
           <SchematicCanvas
+            projectId={projectId}
             drawingPageId={drawingPage.id}
             initialNodes={drawingPage.nodes.map(mapDrawingNodeToReactFlow)}
             initialEdges={drawingPage.edges.map(mapDrawingEdgeToReactFlow)}

@@ -20,11 +20,15 @@ import { portDirections, portSides } from "@/lib/enums";
 export const dynamic = "force-dynamic";
 
 export default async function DeviceInstancePage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ projectId: string; deviceInstanceId: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
 }) {
   const { projectId, deviceInstanceId } = await params;
+  const { returnTo } = await searchParams;
+  const returnPath = returnTo?.startsWith(`/projects/${projectId}/`) ? returnTo : null;
   const [device, locations, connectorTypes, signalTypes] = await Promise.all([
     prisma.deviceInstance.findUnique({
       where: { id: deviceInstanceId },
@@ -55,8 +59,8 @@ export default async function DeviceInstancePage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <Link className="text-sm text-neutral-500 hover:text-neutral-900" href={`/projects/${projectId}/equipment`}>
-            Equipment
+          <Link className="text-sm text-neutral-500 hover:text-neutral-900" href={returnPath ?? `/projects/${projectId}/equipment`}>
+            {returnPath ? "Back to Schematics" : "Equipment"}
           </Link>
           <h2 className="mt-1 text-2xl font-semibold text-neutral-950">{device.tag}</h2>
           <p className="mt-1 text-sm text-neutral-500">
@@ -72,6 +76,7 @@ export default async function DeviceInstancePage({
       <div className="grid gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
         <Panel className="p-4">
           <form action={updateDevice} className="space-y-4">
+            {returnPath && <input type="hidden" name="returnTo" value={returnPath} />}
             <h3 className="text-sm font-semibold text-neutral-950">Equipment Details</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -135,6 +140,7 @@ export default async function DeviceInstancePage({
                           action={updatePort}
                           className="grid min-w-[980px] grid-cols-[1fr_1.2fr_1.35fr_0.9fr_0.8fr_60px_1fr_auto_auto] gap-2"
                         >
+                          {returnPath && <input type="hidden" name="returnTo" value={returnPath} />}
                           <Input name="name" required defaultValue={port.name} aria-label="Port name" />
                           <Select name="connectorTypeId" defaultValue={port.connectorTypeId} aria-label="Connector type">
                             {connectorTypes.map((connector) => (
@@ -180,7 +186,9 @@ export default async function DeviceInstancePage({
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </form>
-                        <form id={`delete-device-port-${port.id}`} action={deletePort} />
+                        <form id={`delete-device-port-${port.id}`} action={deletePort}>
+                          {returnPath && <input type="hidden" name="returnTo" value={returnPath} />}
+                        </form>
                       </Td>
                     </tr>
                   );
@@ -201,6 +209,7 @@ export default async function DeviceInstancePage({
               action={createPort}
               className="grid min-w-[1040px] grid-cols-[1fr_1.15fr_1.3fr_0.9fr_0.85fr_72px_72px_1fr_auto] gap-3"
             >
+              {returnPath && <input type="hidden" name="returnTo" value={returnPath} />}
               <Input name="name" required placeholder="Output 1" aria-label="New port name" />
               <Select name="connectorTypeId" required aria-label="Connector type">
                 {connectorTypes.map((connector) => (
