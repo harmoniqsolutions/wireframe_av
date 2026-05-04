@@ -5,7 +5,7 @@ import type { DiagramDeviceNodeData, DiagramPort } from "@wireframe-av/diagram/s
 import { colorForSignal } from "@wireframe-av/diagram/src/signalColors";
 import { cn } from "@/lib/utils";
 
-const NODE_WIDTH = 270;
+export const NODE_WIDTH = 270;
 const MIN_NODE_HEIGHT = 132;
 const HEADER_HEIGHT = 62;
 const PORT_TOP_PADDING = 24;
@@ -27,6 +27,26 @@ function groupKeyForSide(side: DiagramPort["side"]): PortGroupKey {
   if (side === "FRONT") return "LEFT";
   if (side === "REAR") return "RIGHT";
   return side;
+}
+
+export function getVisibleDevicePorts(data: DiagramDeviceNodeData) {
+  return (data.ports ?? []).filter((port) => port.side !== "TOP" && port.side !== "BOTTOM");
+}
+
+export function getDeviceNodeDimensions(data: DiagramDeviceNodeData) {
+  const ports = getVisibleDevicePorts(data);
+  const leftPortCount = ports.filter((port) => port.side === "LEFT" || port.side === "FRONT").length;
+  const rightPortCount = ports.filter((port) => port.side === "RIGHT" || port.side === "REAR").length;
+  const verticalPortCount = Math.max(leftPortCount, rightPortCount);
+  const verticalPortHeight =
+    verticalPortCount > 0
+      ? PORT_TOP_PADDING + (verticalPortCount - 1) * SIDE_PORT_SPACING + PORT_BOTTOM_PADDING
+      : 0;
+
+  return {
+    width: NODE_WIDTH,
+    height: Math.max(MIN_NODE_HEIGHT, HEADER_HEIGHT + verticalPortHeight)
+  };
 }
 
 function offset(index: number, count: number) {
@@ -83,20 +103,14 @@ function PortLabel({ port, index, count }: { port: DiagramPort; index: number; c
 
 export function DeviceNode({ data, selected }: NodeProps) {
   const nodeData = data as DiagramDeviceNodeData;
-  const allPorts = nodeData.ports ?? [];
-  const ports = allPorts.filter((port) => port.side !== "TOP" && port.side !== "BOTTOM");
+  const ports = getVisibleDevicePorts(nodeData);
   const grouped = {
     LEFT: ports.filter((port) => port.side === "LEFT" || port.side === "FRONT"),
     RIGHT: ports.filter((port) => port.side === "RIGHT" || port.side === "REAR"),
     TOP: [],
     BOTTOM: []
   };
-  const verticalPortCount = Math.max(grouped.LEFT.length, grouped.RIGHT.length);
-  const verticalPortHeight =
-    verticalPortCount > 0
-      ? PORT_TOP_PADDING + (verticalPortCount - 1) * SIDE_PORT_SPACING + PORT_BOTTOM_PADDING
-      : 0;
-  const nodeHeight = Math.max(MIN_NODE_HEIGHT, HEADER_HEIGHT + verticalPortHeight);
+  const nodeHeight = getDeviceNodeDimensions(nodeData).height;
 
   return (
     <div

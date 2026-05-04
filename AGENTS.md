@@ -206,8 +206,9 @@ Recent schema addition:
 
 - `DrawingEdge.routeOffsetX`
 - `DrawingEdge.routeOffsetY`
+- `DrawingEdge.manualWaypoints`
 
-These store manual cable route adjustments for the schematic editor.
+These store manual cable route adjustments for the schematic editor. `routeOffsetX/Y` are legacy/simple route offsets; `manualWaypoints` stores the current EasySchematic-style user-added route handles as JSON points.
 
 ## Seed Data
 
@@ -336,8 +337,19 @@ Implemented:
 - Fullscreen button inside canvas
 - Device sidebar scrolls independently
 - Edges are orthogonal vertical/horizontal routes with rounded corners
-- Edge route handle can be dragged to adjust route
-- Route adjustment persists to `DrawingEdge.routeOffsetX/Y`
+- Default edge routes have no visible edit handle
+- Right-clicking an edge opens a context menu with add route handle, remove nearest handle, reset route, and delete cable actions
+- User-added edge route handles can be dragged to create multi-bend orthogonal cable routes
+- Route handle dragging uses pointer events/pointer capture on the SVG waypoint controls, so React Flow pan/drag handling does not swallow the interaction
+- Route handles persist to `DrawingEdge.manualWaypoints`
+- Automatic routes prefer the minimum number of orthogonal bends, then shorter path length
+- Automatic routes avoid other device blocks using obstacle rectangles derived from the rendered device node dimensions
+- Legacy/simple route adjustment still supports `DrawingEdge.routeOffsetX/Y`
+- Right-clicking a device opens a context menu with reset connected routes, fit drawing, and remove from page actions
+- Removing a device from a schematic page deletes its connected page cables and drawing edges
+- Switching drawing pages now resets React Flow local state from server props, so manual browser refresh is no longer required after page changes
+- Schematic ports and cable edges are color-coded by signal type
+- Project device sidebar has search/filtering
 - Port handles only render on LEFT and RIGHT sides (FRONT maps to LEFT, REAR maps to RIGHT); TOP and BOTTOM ports are excluded from the canvas — underlying port data is unchanged
 
 Important files:
@@ -345,9 +357,11 @@ Important files:
 - `apps/web/features/schematics/schematic-canvas.tsx`
 - `apps/web/features/schematics/device-node.tsx`
 - `apps/web/features/schematics/editable-step-edge.tsx`
+- `apps/web/features/schematics/routing-utils.ts`
 - `apps/web/app/api/drawing-pages/[drawingPageId]/connections/route.ts`
 - `apps/web/app/api/drawing-pages/[drawingPageId]/nodes/route.ts`
 - `apps/web/app/api/drawing-edges/[drawingEdgeId]/route.ts`
+- `apps/web/app/api/drawing-nodes/[drawingNodeId]/route.ts`
 
 UX improvements landed (2026-05-03):
 
@@ -356,10 +370,25 @@ UX improvements landed (2026-05-03):
 - Cable number label opacity is reduced (0.55) when edge is not active, full opacity + stronger border/color when selected.
 - Status messages (connection accepted/rejected, cable removed) auto-dismiss after 3 seconds.
 
+UX improvements landed (2026-05-04):
+
+- Inspired by EasySchematic, cable editing now uses right-click-added manual handles instead of always showing a default drag handle.
+- Edge context menu can add a manual route handle at the clicked cable segment, remove the nearest manual handle, reset the route, or delete the cable.
+- Manual route handles are persisted as `DrawingEdge.manualWaypoints`; the API validates and stores the point array via PATCH.
+- Edge routes use horizontal port stubs and orthogonal point simplification in `routing-utils.ts`.
+- Edge route handle dragging was fixed by switching the waypoint controls from mouse-only handlers to pointer events with pointer capture.
+- Default automatic edge routes now run through an obstacle-aware orthogonal router that favors fewer bends before shorter distance and avoids other schematic device blocks.
+- Device node dimensions are exposed from `device-node.tsx` and reused by `schematic-canvas.tsx` so routing obstacles match rendered block sizes.
+- Device context menu supports reset connected routes, fit drawing, and remove from page.
+- Page switching bug fixed by resyncing React Flow node/edge state when `drawingPageId` changes.
+- Signal metadata is passed through the diagram mapper so port handles/labels and edges can be color-coded by signal type.
+
 Known current UX limitation:
 
-- Manual route control is a single offset/control handle per edge. This is a good MVP but not full multi-segment routing yet.
 - Edge deletion currently deletes the cable. That matches current MVP but may need confirmation UI or soft-delete later.
+- Manual waypoint routing still trusts the user's chosen waypoints and does not automatically reroute around blocks once a manual handle exists.
+- Automatic obstacle routing is grid/candidate-line based rather than full A*; EasySchematic's A* router is still a strong reference for a future deeper pass.
+- Edge label placement is still automatic near the route midpoint; explicit label handles/control are not implemented yet.
 
 ## Connection Validation Status
 
@@ -561,8 +590,8 @@ High-value next passes:
 6. Add tag auto-numbering and device edit forms.
 7. Expose new ProductTemplate fields (referenceUrl, weightLbs, powerWatts, unitCostUsd) in product library UI.
 8. Improve schematic route UX:
-   - Reset route
-   - Multi-bend route points
+   - Full obstacle-aware A* routing inspired by EasySchematic
+   - Line jump arcs at cable crossings
    - Better selection affordances
    - Edge label placement control
 9. ~~Add rack elevation MVP using existing `Rack` and `RackMountedItem`.~~ Done.

@@ -20,13 +20,15 @@ import {
   type Node
 } from "@xyflow/react";
 import { CirclePlus, Focus, Maximize2, Minimize2, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import type { DiagramDeviceNodeData } from "@wireframe-av/diagram/src/diagramTypes";
 import { useEditorStore } from "@/stores/editor-store";
-import { DeviceNode } from "./device-node";
+import { DeviceNode, getDeviceNodeDimensions } from "./device-node";
 import { EditableStepEdge } from "./editable-step-edge";
 import {
   buildOrthogonalRoutePoints,
   projectOntoSegments,
   snapToGrid,
+  type RouteObstacle,
   type RoutePoint
 } from "./routing-utils";
 
@@ -92,6 +94,20 @@ function CanvasInner({
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
   const edgeTypes = useMemo(() => ({ editableStep: EditableStepEdge }), []);
   const placedDeviceIds = new Set(nodes.map((node) => String(node.data.deviceInstanceId)));
+  const routeObstacles = useMemo<RouteObstacle[]>(
+    () =>
+      nodes.map((node) => {
+        const dimensions = getDeviceNodeDimensions(node.data as DiagramDeviceNodeData);
+        return {
+          id: node.id,
+          x: node.position.x,
+          y: node.position.y,
+          width: dimensions.width,
+          height: dimensions.height
+        };
+      }),
+    [nodes]
+  );
   const filteredDevices = useMemo(() => {
     const query = deviceSearch.trim().toLowerCase();
     if (!query) return devices;
@@ -169,10 +185,11 @@ function CanvasInner({
         },
         sourcePosition: sourceHandle.position,
         targetPosition: targetHandle.position,
-        manualWaypoints: edgeData.manualWaypoints ?? []
+        manualWaypoints: edgeData.manualWaypoints ?? [],
+        obstacles: routeObstacles.filter((obstacle) => obstacle.id !== edge.source && obstacle.id !== edge.target)
       });
     },
-    [getInternalNode]
+    [getInternalNode, routeObstacles]
   );
 
   const addRouteHandle = useCallback(
@@ -253,10 +270,11 @@ function CanvasInner({
           routeOffsetX: 0,
           routeOffsetY: 0,
           ...edge.data,
+          obstacles: routeObstacles.filter((obstacle) => obstacle.id !== edge.source && obstacle.id !== edge.target),
           onRouteChange: updateEdgeRoute
         }
       })),
-    [edges, updateEdgeRoute]
+    [edges, routeObstacles, updateEdgeRoute]
   );
 
   useEffect(() => {
