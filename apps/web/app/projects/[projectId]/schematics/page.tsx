@@ -39,14 +39,28 @@ export default async function ProjectSchematicsPage({
               deviceInstance: {
                 include: {
                   productTemplate: true,
-                  ports: true
+                  ports: {
+                    include: {
+                      connectorType: true,
+                      signalType: true
+                    }
+                  }
                 }
               }
             }
           },
           edges: {
             include: {
-              cable: true
+              cable: {
+                include: {
+                  sourceDevicePort: {
+                    include: {
+                      connectorType: true,
+                      signalType: true
+                    }
+                  }
+                }
+              }
             }
           }
         }

@@ -13,7 +13,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ dr
       deviceInstance: {
         include: {
           productTemplate: true,
-          ports: true
+          ports: {
+            include: {
+              connectorType: true,
+              signalType: true
+            }
+          }
         }
       }
     }

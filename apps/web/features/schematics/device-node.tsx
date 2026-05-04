@@ -2,6 +2,7 @@
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { DiagramDeviceNodeData, DiagramPort } from "@wireframe-av/diagram/src/diagramTypes";
+import { colorForSignal } from "@wireframe-av/diagram/src/signalColors";
 import { cn } from "@/lib/utils";
 
 const NODE_WIDTH = 270;
@@ -40,11 +41,18 @@ function PortHandle({ port, index, count }: { port: DiagramPort; index: number; 
     : { left: offset(index, count) };
   const canSource = port.direction === "OUTPUT" || port.direction === "BIDIRECTIONAL";
   const canTarget = port.direction === "INPUT" || port.direction === "BIDIRECTIONAL";
+  const handleStyle = {
+    ...style,
+    backgroundColor: colorForSignal(port.signalTypeName),
+    borderColor: "white",
+    height: 10,
+    width: 10
+  };
 
   return (
     <>
-      {canSource && <Handle id={port.id} type="source" position={position} style={style} />}
-      {canTarget && <Handle id={port.id} type="target" position={position} style={style} />}
+      {canSource && <Handle id={port.id} type="source" position={position} style={handleStyle} />}
+      {canTarget && <Handle id={port.id} type="target" position={position} style={handleStyle} />}
     </>
   );
 }
@@ -66,9 +74,9 @@ function PortLabel({ port, index, count }: { port: DiagramPort; index: number; c
         position === Position.Bottom && "bottom-2 w-20 text-center"
       )}
       style={style}
-      title={port.name}
+      title={`${port.name} / ${port.connectorTypeName} / ${port.signalTypeName}`}
     >
-      {port.name}
+      <span style={{ color: colorForSignal(port.signalTypeName) }}>{port.name}</span>
     </div>
   );
 }
@@ -104,8 +112,11 @@ export function DeviceNode({ data, selected }: NodeProps) {
           {nodeData.displayName ?? `${nodeData.productName} ${nodeData.productModel}`}
         </div>
       </div>
-      <div className="px-4 py-8 text-center text-[11px] uppercase text-neutral-500">
-        {nodeData.productModel}
+      <div className="flex h-[70px] flex-col items-center justify-center px-4 text-center">
+        <div className="text-[11px] uppercase text-neutral-500">{nodeData.productModel}</div>
+        <div className="mt-1 text-[10px] uppercase text-neutral-400">
+          {ports.length} visible ports
+        </div>
       </div>
       {ports.map((port) => {
         const list = grouped[groupKeyForSide(port.side)] ?? [];

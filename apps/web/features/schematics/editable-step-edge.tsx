@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useReactFlow, type EdgeProps } from "@xyflow/react";
+import { colorForSignal } from "@wireframe-av/diagram/src/signalColors";
 
 type EditableStepEdgeData = {
   routeOffsetX?: number;
   routeOffsetY?: number;
+  signalTypeName?: string;
+  connectorTypeName?: string;
   onRouteChange?: (edgeId: string, route: { routeOffsetX: number; routeOffsetY: number }) => void;
 };
 
@@ -78,6 +81,7 @@ export function EditableStepEdge({
   data
 }: EdgeProps) {
   const edgeData = useMemo(() => (data ?? {}) as EditableStepEdgeData, [data]);
+  const signalColor = colorForSignal(edgeData.signalTypeName);
   const { screenToFlowPosition } = useReactFlow();
   const [routeOffset, setRouteOffset] = useState({
     x: edgeData.routeOffsetX ?? 0,
@@ -164,7 +168,7 @@ export function EditableStepEdge({
         path={edgePath || fallbackPath}
         markerEnd={markerEnd}
         style={{
-          stroke: selected ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
+          stroke: selected ? "hsl(var(--foreground))" : signalColor,
           strokeWidth: selected ? 2.5 : 1.75
         }}
       />
@@ -181,6 +185,7 @@ export function EditableStepEdge({
           }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
+          title={[label, edgeData.signalTypeName, edgeData.connectorTypeName].filter(Boolean).join(" / ")}
         >
           {label}
         </div>

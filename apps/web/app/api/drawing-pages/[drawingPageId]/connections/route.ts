@@ -139,7 +139,16 @@ export async function POST(request: NextRequest, context: { params: Promise<{ dr
         targetNodeId
       },
       include: {
-        cable: true
+        cable: {
+          include: {
+            sourceDevicePort: {
+              include: {
+                connectorType: true,
+                signalType: true
+              }
+            }
+          }
+        }
       }
     });
   });

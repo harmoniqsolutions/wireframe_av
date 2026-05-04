@@ -15,6 +15,12 @@ type DrawingNodeRecord = {
     ports: Array<{
       id: string;
       name: string;
+      connectorType: {
+        name: string;
+      };
+      signalType: {
+        name: string;
+      };
       direction: "INPUT" | "OUTPUT" | "BIDIRECTIONAL";
       side: "LEFT" | "RIGHT" | "TOP" | "BOTTOM" | "FRONT" | "REAR";
       sortOrder: number;
@@ -32,6 +38,14 @@ type DrawingEdgeRecord = {
     cableNumber: string;
     sourceDevicePortId: string;
     destinationDevicePortId: string;
+    sourceDevicePort?: {
+      connectorType: {
+        name: string;
+      };
+      signalType: {
+        name: string;
+      };
+    };
   };
 };
 
@@ -53,6 +67,8 @@ export function mapDrawingNodeToReactFlow(node: DrawingNodeRecord): DiagramNode 
         .map((port) => ({
           id: port.id,
           name: port.name,
+          connectorTypeName: port.connectorType.name,
+          signalTypeName: port.signalType.name,
           direction: port.direction,
           side: port.side,
           sortOrder: port.sortOrder
@@ -73,7 +89,9 @@ export function mapDrawingEdgeToReactFlow(edge: DrawingEdgeRecord): DiagramEdge 
     label: edge.cable.cableNumber,
     data: {
       routeOffsetX: edge.routeOffsetX,
-      routeOffsetY: edge.routeOffsetY
+      routeOffsetY: edge.routeOffsetY,
+      signalTypeName: edge.cable.sourceDevicePort?.signalType.name,
+      connectorTypeName: edge.cable.sourceDevicePort?.connectorType.name
     }
   };
 }

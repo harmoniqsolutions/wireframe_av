@@ -4,7 +4,9 @@ import "@xyflow/react/dist/style.css";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  BackgroundVariant,
   Background,
+  ConnectionMode,
   Controls,
   MiniMap,
   ReactFlow,
@@ -16,7 +18,7 @@ import {
   type Edge,
   type Node
 } from "@xyflow/react";
-import { Maximize2, Minimize2, Plus } from "lucide-react";
+import { Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { useEditorStore } from "@/stores/editor-store";
 import { DeviceNode } from "./device-node";
 import { EditableStepEdge } from "./editable-step-edge";
@@ -46,6 +48,7 @@ function CanvasInner({
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [deviceSearch, setDeviceSearch] = useState("");
   const { message, setMessage: setRawMessage } = useEditorStore();
 
   const setMessage = useCallback(
@@ -62,6 +65,13 @@ function CanvasInner({
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
   const edgeTypes = useMemo(() => ({ editableStep: EditableStepEdge }), []);
   const placedDeviceIds = new Set(nodes.map((node) => String(node.data.deviceInstanceId)));
+  const filteredDevices = useMemo(() => {
+    const query = deviceSearch.trim().toLowerCase();
+    if (!query) return devices;
+    return devices.filter((device) =>
+      [device.tag, device.name, device.model].some((value) => value.toLowerCase().includes(query))
+    );
+  }, [deviceSearch, devices]);
 
   const updateEdgeRoute = useCallback(
     async (edgeId: string, route: { routeOffsetX: number; routeOffsetY: number }) => {
@@ -118,8 +128,8 @@ function CanvasInner({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           deviceInstanceId: deviceId,
-          x: 80 + nodes.length * 48,
-          y: 80 + nodes.length * 24
+          x: 80 + nodes.length * 40,
+          y: 80 + nodes.length * 20
         })
       });
       const payload = await response.json();
@@ -214,8 +224,17 @@ function CanvasInner({
         <div className="mb-3">
           <h3 className="text-sm font-semibold text-neutral-950">Project Devices</h3>
         </div>
+        <label className="mb-3 flex h-9 items-center gap-2 rounded-md border border-neutral-200 bg-white px-2 text-sm text-neutral-500">
+          <Search className="h-4 w-4 shrink-0" />
+          <input
+            value={deviceSearch}
+            onChange={(event) => setDeviceSearch(event.target.value)}
+            placeholder="Search devices"
+            className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
+          />
+        </label>
         <div className="space-y-2">
-          {devices.map((device) => {
+          {filteredDevices.map((device) => {
             const placed = placedDeviceIds.has(device.id);
             return (
               <button
@@ -234,6 +253,9 @@ function CanvasInner({
             );
           })}
           {!devices.length && <p className="text-sm text-neutral-500">Add project equipment before building schematics.</p>}
+          {devices.length > 0 && !filteredDevices.length && (
+            <p className="text-sm text-neutral-500">No project devices match this search.</p>
+          )}
         </div>
       </aside>
       <section className="relative min-h-0">
@@ -260,9 +282,16 @@ function CanvasInner({
           onEdgesDelete={onEdgesDelete}
           onConnect={onConnect}
           onNodeDragStop={(_, node) => persistNode(node)}
+          connectionMode={ConnectionMode.Loose}
+          connectOnClick
+          connectionRadius={28}
+          defaultEdgeOptions={{ type: "editableStep", interactionWidth: 18 }}
           fitView
+          proOptions={{ hideAttribution: true }}
+          snapToGrid
+          snapGrid={[20, 20]}
         >
-          <Background gap={24} size={1} color="hsl(var(--border))" />
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(var(--border))" />
           <MiniMap pannable zoomable nodeColor="#737373" />
           <Controls />
         </ReactFlow>
