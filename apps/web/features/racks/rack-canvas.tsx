@@ -350,14 +350,22 @@ export function RackCanvas({ rackId, heightRu, numberingDirection, initialItems,
                   }}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-neutral-950">{item.deviceTag}</span>
-                      <span className="text-[11px] text-neutral-500">{item.heightRu}U</span>
-                    </div>
-                    {item.heightRu > 1 && (
-                      <div className="truncate text-[10px] text-neutral-400">
-                        {item.deviceDisplayName ?? item.productName}
+                    {item.heightRu === 1 ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-neutral-950">{item.deviceTag}</span>
+                        <span className="shrink-0 text-[11px] text-neutral-400">{item.heightRu}U</span>
+                        <span className="truncate text-[11px] text-neutral-400">{item.deviceDisplayName ?? item.productName}</span>
                       </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-neutral-950">{item.deviceTag}</span>
+                          <span className="text-[11px] text-neutral-400">{item.heightRu}U</span>
+                        </div>
+                        <div className="truncate text-[11px] text-neutral-400">
+                          {item.deviceDisplayName ?? item.productName}
+                        </div>
+                      </>
                     )}
                   </div>
                   <button
