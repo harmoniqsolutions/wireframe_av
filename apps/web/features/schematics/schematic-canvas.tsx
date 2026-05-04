@@ -12,16 +12,23 @@ import {
   ReactFlow,
   ReactFlowProvider,
   addEdge,
+  useReactFlow,
   useEdgesState,
   useNodesState,
   type Connection,
   type Edge,
   type Node
 } from "@xyflow/react";
-import { Maximize2, Minimize2, Plus, Search } from "lucide-react";
+import { CirclePlus, Focus, Maximize2, Minimize2, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEditorStore } from "@/stores/editor-store";
 import { DeviceNode } from "./device-node";
 import { EditableStepEdge } from "./editable-step-edge";
+import {
+  buildOrthogonalRoutePoints,
+  projectOntoSegments,
+  snapToGrid,
+  type RoutePoint
+} from "./routing-utils";
 
 type SidebarDevice = {
   id: string;
@@ -30,6 +37,24 @@ type SidebarDevice = {
   model: string;
   placed: boolean;
 };
+
+type ContextMenu =
+  | {
+      kind: "node";
+      nodeId: string;
+      label: string;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "edge";
+      edgeId: string;
+      label: string;
+      x: number;
+      y: number;
+      flowX: number;
+      flowY: number;
+    };
 
 function CanvasInner({
   drawingPageId,
@@ -44,11 +69,13 @@ function CanvasInner({
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const { fitView, getInternalNode, screenToFlowPosition } = useReactFlow();
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [deviceSearch, setDeviceSearch] = useState("");
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const { message, setMessage: setRawMessage } = useEditorStore();
 
   const setMessage = useCallback(
@@ -74,7 +101,7 @@ function CanvasInner({
   }, [deviceSearch, devices]);
 
   const updateEdgeRoute = useCallback(
-    async (edgeId: string, route: { routeOffsetX: number; routeOffsetY: number }) => {
+    async (edgeId: string, route: { routeOffsetX: number; routeOffsetY: number; manualWaypoints?: RoutePoint[] }) => {
       setEdges((current) =>
         current.map((edge) =>
           edge.id === edgeId
@@ -106,6 +133,117 @@ function CanvasInner({
     [setEdges, setMessage]
   );
 
+  const getEdgeRoutePoints = useCallback(
+    (edge: Edge) => {
+      const sourceInternal = getInternalNode(edge.source);
+      const targetInternal = getInternalNode(edge.target);
+      const sourceBounds = sourceInternal?.internals.handleBounds;
+      const targetBounds = targetInternal?.internals.handleBounds;
+      const sourceHandle = [...(sourceBounds?.source ?? []), ...(sourceBounds?.target ?? [])].find(
+        (handle) => handle.id === edge.sourceHandle
+      );
+      const targetHandle = [...(targetBounds?.source ?? []), ...(targetBounds?.target ?? [])].find(
+        (handle) => handle.id === edge.targetHandle
+      );
+
+      if (!sourceInternal || !targetInternal || !sourceHandle || !targetHandle) return null;
+
+      const edgeData = (edge.data ?? {}) as {
+        routeOffsetX?: number;
+        routeOffsetY?: number;
+        manualWaypoints?: RoutePoint[];
+      };
+
+      return buildOrthogonalRoutePoints({
+        source: {
+          x: Math.round(sourceInternal.internals.positionAbsolute.x + sourceHandle.x + sourceHandle.width / 2),
+          y: Math.round(sourceInternal.internals.positionAbsolute.y + sourceHandle.y + sourceHandle.height / 2)
+        },
+        target: {
+          x: Math.round(targetInternal.internals.positionAbsolute.x + targetHandle.x + targetHandle.width / 2),
+          y: Math.round(targetInternal.internals.positionAbsolute.y + targetHandle.y + targetHandle.height / 2)
+        },
+        routeOffset: {
+          x: edgeData.routeOffsetX ?? 0,
+          y: edgeData.routeOffsetY ?? 0
+        },
+        sourcePosition: sourceHandle.position,
+        targetPosition: targetHandle.position,
+        manualWaypoints: edgeData.manualWaypoints ?? []
+      });
+    },
+    [getInternalNode]
+  );
+
+  const addRouteHandle = useCallback(
+    async (edgeId: string, flowPoint: RoutePoint) => {
+      const edge = edges.find((item) => item.id === edgeId);
+      if (!edge) return;
+
+      const routePoints = getEdgeRoutePoints(edge);
+      if (!routePoints) {
+        setContextMenu(null);
+        setMessage("Unable to add a route handle until the cable is measured on the canvas.");
+        return;
+      }
+
+      const edgeData = (edge.data ?? {}) as { manualWaypoints?: RoutePoint[] };
+      const existingWaypoints = edgeData.manualWaypoints ?? [];
+      const projected = projectOntoSegments(flowPoint, routePoints);
+      const start = routePoints[projected.segmentIndex];
+      const end = routePoints[projected.segmentIndex + 1];
+      const nextWaypoint =
+        start && end && start.y === end.y
+          ? { x: snapToGrid(projected.point.x), y: start.y }
+          : start && end && start.x === end.x
+            ? { x: start.x, y: snapToGrid(projected.point.y) }
+            : { x: snapToGrid(projected.point.x), y: snapToGrid(projected.point.y) };
+
+      const existingSegmentIndexes = existingWaypoints.map((waypoint) => projectOntoSegments(waypoint, routePoints).segmentIndex);
+      let insertIndex = existingWaypoints.length;
+      for (let index = 0; index < existingSegmentIndexes.length; index += 1) {
+        if (projected.segmentIndex <= existingSegmentIndexes[index]) {
+          insertIndex = index;
+          break;
+        }
+      }
+
+      const manualWaypoints = [...existingWaypoints];
+      manualWaypoints.splice(insertIndex, 0, nextWaypoint);
+      await updateEdgeRoute(edgeId, { routeOffsetX: 0, routeOffsetY: 0, manualWaypoints });
+      setContextMenu(null);
+    },
+    [edges, getEdgeRoutePoints, setMessage, updateEdgeRoute]
+  );
+
+  const removeNearestRouteHandle = useCallback(
+    async (edgeId: string, flowPoint: RoutePoint) => {
+      const edge = edges.find((item) => item.id === edgeId);
+      const edgeData = (edge?.data ?? {}) as { manualWaypoints?: RoutePoint[] };
+      const manualWaypoints = edgeData.manualWaypoints ?? [];
+      if (!manualWaypoints.length) {
+        setContextMenu(null);
+        return;
+      }
+
+      let nearestIndex = 0;
+      let nearestDistance = Infinity;
+      for (let index = 0; index < manualWaypoints.length; index += 1) {
+        const point = manualWaypoints[index];
+        const distance = Math.abs(point.x - flowPoint.x) + Math.abs(point.y - flowPoint.y);
+        if (distance < nearestDistance) {
+          nearestIndex = index;
+          nearestDistance = distance;
+        }
+      }
+
+      const nextWaypoints = manualWaypoints.filter((_, index) => index !== nearestIndex);
+      await updateEdgeRoute(edgeId, { routeOffsetX: 0, routeOffsetY: 0, manualWaypoints: nextWaypoints });
+      setContextMenu(null);
+    },
+    [edges, updateEdgeRoute]
+  );
+
   const routedEdges = useMemo(
     () =>
       edges.map((edge) => ({
@@ -120,6 +258,15 @@ function CanvasInner({
       })),
     [edges, updateEdgeRoute]
   );
+
+  useEffect(() => {
+    Object.values(saveTimers.current).forEach((timer) => clearTimeout(timer));
+    saveTimers.current = {};
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    setContextMenu(null);
+    setMessage(null);
+  }, [drawingPageId, initialEdges, initialNodes, setEdges, setMessage, setNodes]);
 
   const addDevice = useCallback(
     async (deviceId: string) => {
@@ -184,6 +331,77 @@ function CanvasInner({
     [setMessage]
   );
 
+  const deleteEdge = useCallback(
+    async (edgeId: string) => {
+      const response = await fetch(`/api/drawing-edges/${edgeId}`, { method: "DELETE" });
+      if (!response.ok) {
+        setMessage("Unable to remove the cable for the deleted drawing edge.");
+        return;
+      }
+      setEdges((current) => current.filter((edge) => edge.id !== edgeId));
+      setContextMenu(null);
+      setMessage("Cable removed from the project schedule.");
+    },
+    [setEdges, setMessage]
+  );
+
+  const resetConnectedRoutes = useCallback(
+    async (nodeId: string) => {
+      const connectedEdges = edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
+      if (!connectedEdges.length) {
+        setContextMenu(null);
+        setMessage("No connected cable routes to reset.");
+        return;
+      }
+
+      setEdges((current) =>
+        current.map((edge) =>
+          connectedEdges.some((connectedEdge) => connectedEdge.id === edge.id)
+            ? {
+                ...edge,
+                data: {
+                  ...edge.data,
+                  routeOffsetX: 0,
+                  routeOffsetY: 0,
+                  manualWaypoints: []
+                }
+              }
+            : edge
+        )
+      );
+
+      const results = await Promise.all(
+        connectedEdges.map((edge) =>
+          fetch(`/api/drawing-edges/${edge.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ routeOffsetX: 0, routeOffsetY: 0, manualWaypoints: [] })
+          })
+        )
+      );
+
+      setContextMenu(null);
+      setMessage(results.every((response) => response.ok) ? "Connected cable routes reset." : "Some cable routes could not be reset.");
+    },
+    [edges, setEdges, setMessage]
+  );
+
+  const removeNodeFromPage = useCallback(
+    async (nodeId: string) => {
+      const response = await fetch(`/api/drawing-nodes/${nodeId}`, { method: "DELETE" });
+      if (!response.ok) {
+        setMessage("Unable to remove device from schematic page.");
+        return;
+      }
+
+      setNodes((current) => current.filter((node) => node.id !== nodeId));
+      setEdges((current) => current.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+      setContextMenu(null);
+      setMessage("Device removed from page. Connected page cables were removed.");
+    },
+    [setEdges, setMessage, setNodes]
+  );
+
   const persistNode = useCallback((node: Node) => {
     clearTimeout(saveTimers.current[node.id]);
     saveTimers.current[node.id] = setTimeout(() => {
@@ -205,6 +423,11 @@ function CanvasInner({
 
     await workspaceRef.current.requestFullscreen();
   }, []);
+
+  const fitDrawing = useCallback(() => {
+    setContextMenu(null);
+    window.requestAnimationFrame(() => fitView({ padding: 0.2, duration: 250 }));
+  }, [fitView]);
 
   useEffect(() => {
     function updateFullscreenState() {
@@ -281,6 +504,31 @@ function CanvasInner({
           onEdgesChange={onEdgesChange}
           onEdgesDelete={onEdgesDelete}
           onConnect={onConnect}
+          onPaneClick={() => setContextMenu(null)}
+          onNodeContextMenu={(event, node) => {
+            event.preventDefault();
+            const nodeData = node.data as { tag?: string; displayName?: string | null; productName?: string; productModel?: string };
+            setContextMenu({
+              kind: "node",
+              nodeId: node.id,
+              label: nodeData.tag ?? nodeData.displayName ?? nodeData.productName ?? "Device",
+              x: event.clientX,
+              y: event.clientY
+            });
+          }}
+          onEdgeContextMenu={(event, edge) => {
+            event.preventDefault();
+            const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+            setContextMenu({
+              kind: "edge",
+              edgeId: edge.id,
+              label: String(edge.label ?? "Cable"),
+              x: event.clientX,
+              y: event.clientY,
+              flowX: flowPosition.x,
+              flowY: flowPosition.y
+            });
+          }}
           onNodeDragStop={(_, node) => persistNode(node)}
           connectionMode={ConnectionMode.Loose}
           connectOnClick
@@ -295,6 +543,81 @@ function CanvasInner({
           <MiniMap pannable zoomable nodeColor="#737373" />
           <Controls />
         </ReactFlow>
+        {contextMenu && (
+          <div
+            className="fixed z-50 w-56 overflow-hidden rounded-md border border-neutral-200 bg-white py-1 text-sm shadow-lg"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <div className="border-b border-neutral-100 px-3 py-2 text-xs font-semibold uppercase text-neutral-500">
+              {contextMenu.label}
+            </div>
+            {contextMenu.kind === "edge" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => addRouteHandle(contextMenu.edgeId, { x: contextMenu.flowX, y: contextMenu.flowY })}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100"
+                >
+                  <CirclePlus className="h-4 w-4" />
+                  Add route handle
+                </button>
+                {(((edges.find((edge) => edge.id === contextMenu.edgeId)?.data ?? {}) as { manualWaypoints?: RoutePoint[] }).manualWaypoints?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => removeNearestRouteHandle(contextMenu.edgeId, { x: contextMenu.flowX, y: contextMenu.flowY })}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove nearest handle
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => updateEdgeRoute(contextMenu.edgeId, { routeOffsetX: 0, routeOffsetY: 0, manualWaypoints: [] }).then(() => setContextMenu(null))}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset route
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteEdge(contextMenu.edgeId)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete cable
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => resetConnectedRoutes(contextMenu.nodeId)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset connected routes
+                </button>
+                <button
+                  type="button"
+                  onClick={fitDrawing}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100"
+                >
+                  <Focus className="h-4 w-4" />
+                  Fit drawing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeNodeFromPage(contextMenu.nodeId)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remove from page
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

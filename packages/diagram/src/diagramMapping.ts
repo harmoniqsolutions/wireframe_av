@@ -1,4 +1,18 @@
-import type { DiagramEdge, DiagramNode } from "./diagramTypes";
+import type { DiagramEdge, DiagramNode, DiagramWaypoint } from "./diagramTypes";
+
+function parseWaypoints(value: unknown): DiagramWaypoint[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((point) => {
+      if (!point || typeof point !== "object") return null;
+      const record = point as Record<string, unknown>;
+      const x = Number(record.x);
+      const y = Number(record.y);
+      return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    })
+    .filter((point): point is DiagramWaypoint => point !== null);
+}
 
 type DrawingNodeRecord = {
   id: string;
@@ -34,6 +48,7 @@ type DrawingEdgeRecord = {
   targetNodeId: string;
   routeOffsetX: number;
   routeOffsetY: number;
+  manualWaypoints: unknown;
   cable: {
     cableNumber: string;
     sourceDevicePortId: string;
@@ -90,6 +105,7 @@ export function mapDrawingEdgeToReactFlow(edge: DrawingEdgeRecord): DiagramEdge 
     data: {
       routeOffsetX: edge.routeOffsetX,
       routeOffsetY: edge.routeOffsetY,
+      manualWaypoints: parseWaypoints(edge.manualWaypoints),
       signalTypeName: edge.cable.sourceDevicePort?.signalType.name,
       connectorTypeName: edge.cable.sourceDevicePort?.connectorType.name
     }

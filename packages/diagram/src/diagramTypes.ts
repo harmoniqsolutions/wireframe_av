@@ -1,5 +1,10 @@
 import type { PortDirection, PortSide } from "@wireframe-av/shared/src/types";
 
+export type DiagramWaypoint = {
+  x: number;
+  y: number;
+};
+
 export type DiagramPort = {
   id: string;
   name: string;
@@ -40,6 +45,7 @@ export type DiagramEdge = {
   data: {
     routeOffsetX: number;
     routeOffsetY: number;
+    manualWaypoints: DiagramWaypoint[];
     signalTypeName?: string;
     connectorTypeName?: string;
   };

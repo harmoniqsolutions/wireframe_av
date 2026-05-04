@@ -1,73 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useReactFlow, type EdgeProps } from "@xyflow/react";
 import { colorForSignal } from "@wireframe-av/diagram/src/signalColors";
+import {
+  buildOrthogonalRoutePoints,
+  roundedOrthogonalPath,
+  snapToGrid,
+  type RoutePoint
+} from "./routing-utils";
 
 type EditableStepEdgeData = {
   routeOffsetX?: number;
   routeOffsetY?: number;
+  manualWaypoints?: RoutePoint[];
   signalTypeName?: string;
   connectorTypeName?: string;
-  onRouteChange?: (edgeId: string, route: { routeOffsetX: number; routeOffsetY: number }) => void;
+  onRouteChange?: (edgeId: string, route: { routeOffsetX: number; routeOffsetY: number; manualWaypoints?: RoutePoint[] }) => void;
 };
-
-type Point = {
-  x: number;
-  y: number;
-};
-
-function distance(a: Point, b: Point) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function roundedOrthogonalPath(points: Point[], radius = 18) {
-  if (points.length < 2) return "";
-
-  let path = `M ${points[0].x} ${points[0].y}`;
-
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const previous = points[index - 1];
-    const current = points[index];
-    const next = points[index + 1];
-    const previousDistance = distance(previous, current);
-    const nextDistance = distance(current, next);
-    const cornerRadius = Math.min(radius, previousDistance / 2, nextDistance / 2);
-
-    if (cornerRadius < 1) {
-      path += ` L ${current.x} ${current.y}`;
-      continue;
-    }
-
-    const beforeCorner = {
-      x: current.x + ((previous.x - current.x) / previousDistance) * cornerRadius,
-      y: current.y + ((previous.y - current.y) / previousDistance) * cornerRadius
-    };
-    const afterCorner = {
-      x: current.x + ((next.x - current.x) / nextDistance) * cornerRadius,
-      y: current.y + ((next.y - current.y) / nextDistance) * cornerRadius
-    };
-
-    path += ` L ${beforeCorner.x} ${beforeCorner.y} Q ${current.x} ${current.y} ${afterCorner.x} ${afterCorner.y}`;
-  }
-
-  const last = points[points.length - 1];
-  path += ` L ${last.x} ${last.y}`;
-  return path;
-}
-
-function orthogonalPoints(source: Point, target: Point, routeOffset: Point) {
-  const midX = (source.x + target.x) / 2 + routeOffset.x;
-  const midY = (source.y + target.y) / 2 + routeOffset.y;
-
-  return [
-    source,
-    { x: midX, y: source.y },
-    { x: midX, y: midY },
-    { x: target.x, y: midY },
-    target
-  ];
-}
 
 export function EditableStepEdge({
   id,
@@ -76,73 +26,88 @@ export function EditableStepEdge({
   targetX,
   targetY,
   selected,
+  sourcePosition,
+  targetPosition,
   markerEnd,
   label,
   data
 }: EdgeProps) {
   const edgeData = useMemo(() => (data ?? {}) as EditableStepEdgeData, [data]);
+  const manualWaypoints = useMemo(() => edgeData.manualWaypoints ?? [], [edgeData.manualWaypoints]);
   const signalColor = colorForSignal(edgeData.signalTypeName);
   const { screenToFlowPosition } = useReactFlow();
-  const [routeOffset, setRouteOffset] = useState({
-    x: edgeData.routeOffsetX ?? 0,
-    y: edgeData.routeOffsetY ?? 0
-  });
-  const routeOffsetRef = useRef(routeOffset);
+  const [activeWaypoints, setActiveWaypoints] = useState<RoutePoint[]>(manualWaypoints);
+  const activeWaypointsRef = useRef(activeWaypoints);
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    const nextRouteOffset = {
-      x: edgeData.routeOffsetX ?? 0,
-      y: edgeData.routeOffsetY ?? 0
-    };
-    setRouteOffset(nextRouteOffset);
-    routeOffsetRef.current = nextRouteOffset;
-  }, [edgeData.routeOffsetX, edgeData.routeOffsetY]);
+    setActiveWaypoints(manualWaypoints);
+    activeWaypointsRef.current = manualWaypoints;
+  }, [manualWaypoints]);
 
   const source = useMemo(() => ({ x: sourceX, y: sourceY }), [sourceX, sourceY]);
   const target = useMemo(() => ({ x: targetX, y: targetY }), [targetX, targetY]);
-  const controlPoint = useMemo(
+  const routeOffset = useMemo(
     () => ({
-      x: (sourceX + targetX) / 2 + routeOffset.x,
-      y: (sourceY + targetY) / 2 + routeOffset.y
+      x: edgeData.routeOffsetX ?? 0,
+      y: edgeData.routeOffsetY ?? 0
     }),
-    [routeOffset.x, routeOffset.y, sourceX, sourceY, targetX, targetY]
+    [edgeData.routeOffsetX, edgeData.routeOffsetY]
   );
-
-  const edgePath = useMemo(
-    () => roundedOrthogonalPath(orthogonalPoints(source, target, routeOffset), 18),
-    [routeOffset, source, target]
+  const routePoints = useMemo(
+    () =>
+      buildOrthogonalRoutePoints({
+        source,
+        target,
+        routeOffset,
+        sourcePosition,
+        targetPosition,
+        manualWaypoints: activeWaypoints
+      }),
+    [activeWaypoints, routeOffset, source, sourcePosition, target, targetPosition]
   );
+  const controlPoint = routePoints[Math.floor(routePoints.length / 2)] ?? {
+    x: (sourceX + targetX) / 2,
+    y: (sourceY + targetY) / 2
+  };
+  const edgePath = useMemo(() => roundedOrthogonalPath(routePoints, 12), [routePoints]);
 
   const fallbackPath = useMemo(
     () => getBezierPath({ sourceX, sourceY, targetX, targetY })[0],
     [sourceX, sourceY, targetX, targetY]
   );
 
-  const startDrag = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const startWaypointDrag = useCallback(
+    (event: ReactMouseEvent<SVGCircleElement>, waypointIndex: number) => {
       event.preventDefault();
       event.stopPropagation();
 
       const startPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      const startOffset = routeOffsetRef.current;
+      const originalWaypoints = activeWaypointsRef.current.map((point) => ({ ...point }));
+      const originalPoint = originalWaypoints[waypointIndex];
+      if (!originalPoint) return;
 
       function move(moveEvent: PointerEvent) {
         const currentPosition = screenToFlowPosition({ x: moveEvent.clientX, y: moveEvent.clientY });
-        const nextOffset = {
-          x: startOffset.x + currentPosition.x - startPosition.x,
-          y: startOffset.y + currentPosition.y - startPosition.y
-        };
-        routeOffsetRef.current = nextOffset;
-        setRouteOffset(nextOffset);
+        const nextWaypoints = originalWaypoints.map((point, index) =>
+          index === waypointIndex
+            ? {
+                x: snapToGrid(originalPoint.x + currentPosition.x - startPosition.x),
+                y: snapToGrid(originalPoint.y + currentPosition.y - startPosition.y)
+              }
+            : point
+        );
+        activeWaypointsRef.current = nextWaypoints;
+        setActiveWaypoints(nextWaypoints);
       }
 
       function stop() {
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", stop);
         edgeData.onRouteChange?.(id, {
-          routeOffsetX: routeOffsetRef.current.x,
-          routeOffsetY: routeOffsetRef.current.y
+          routeOffsetX: 0,
+          routeOffsetY: 0,
+          manualWaypoints: activeWaypointsRef.current
         });
       }
 
@@ -152,14 +117,7 @@ export function EditableStepEdge({
     [edgeData, id, screenToFlowPosition]
   );
 
-  const resetRoute = useCallback(async () => {
-    const zero = { x: 0, y: 0 };
-    routeOffsetRef.current = zero;
-    setRouteOffset(zero);
-    edgeData.onRouteChange?.(id, { routeOffsetX: 0, routeOffsetY: 0 });
-  }, [edgeData, id]);
-
-  const showControls = selected || hovered;
+  const showWaypointHandles = (selected || hovered) && activeWaypoints.length > 0;
 
   return (
     <>
@@ -181,7 +139,7 @@ export function EditableStepEdge({
             borderColor: selected ? "hsl(var(--foreground))" : "hsl(var(--border))",
             backgroundColor: "hsl(var(--card))",
             color: selected ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
-            opacity: showControls ? 1 : 0.55
+            opacity: selected || hovered ? 1 : 0.55
           }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
@@ -189,40 +147,24 @@ export function EditableStepEdge({
         >
           {label}
         </div>
-        {showControls && (
-          <>
-            <button
-              type="button"
-              onPointerDown={startDrag}
-              onMouseEnter={() => setHovered(true)}
-              onMouseLeave={() => setHovered(false)}
-              className="nodrag nopan absolute h-4 w-4 rounded-sm border border-neutral-700 bg-white shadow-sm transition hover:bg-neutral-100"
-              style={{
-                transform: `translate(-50%, -50%) translate(${controlPoint.x}px, ${controlPoint.y}px)`,
-                pointerEvents: "all"
-              }}
-              aria-label={`Adjust route for ${label ?? "cable"}`}
-              title="Drag to adjust cable route"
-            />
-            {(routeOffset.x !== 0 || routeOffset.y !== 0) && (
-              <button
-                type="button"
-                onClick={resetRoute}
-                onMouseEnter={() => setHovered(true)}
-                onMouseLeave={() => setHovered(false)}
-                className="nodrag nopan absolute rounded border border-neutral-300 bg-white px-1 py-0.5 text-[9px] text-neutral-500 shadow-sm transition hover:border-neutral-400 hover:text-neutral-700"
-                style={{
-                  transform: `translate(-50%, -50%) translate(${controlPoint.x}px, ${controlPoint.y + 18}px)`,
-                  pointerEvents: "all"
-                }}
-                title="Reset cable route to default"
-              >
-                reset
-              </button>
-            )}
-          </>
-        )}
       </EdgeLabelRenderer>
+      {showWaypointHandles && (
+        <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+          {activeWaypoints.map((waypoint, index) => (
+            <g key={`${id}-waypoint-${index}`}>
+              <circle cx={waypoint.x} cy={waypoint.y} r={5} fill="white" stroke="#171717" strokeWidth={2} />
+              <circle
+                cx={waypoint.x}
+                cy={waypoint.y}
+                r={12}
+                fill="transparent"
+                className="nodrag nopan cursor-grab"
+                onMouseDown={(event) => startWaypointDrag(event, index)}
+              />
+            </g>
+          ))}
+        </g>
+      )}
     </>
   );
 }
