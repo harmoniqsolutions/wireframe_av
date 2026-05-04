@@ -1,0 +1,7 @@
+{
+  "name": "@wireframe-av/validation",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/connectionValidation.ts",
+  "types": "src/connectionValidation.ts"
+}

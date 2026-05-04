@@ -1,0 +1,7 @@
+{
+  "name": "@wireframe-av/diagram",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/diagramTypes.ts",
+  "types": "src/diagramTypes.ts"
+}

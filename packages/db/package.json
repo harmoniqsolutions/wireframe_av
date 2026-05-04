@@ -1,0 +1,10 @@
+{
+  "name": "@wireframe-av/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/client.ts",
+  "types": "src/client.ts",
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  }
+}

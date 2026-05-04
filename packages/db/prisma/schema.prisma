@@ -1,0 +1,404 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum VerificationStatus {
+  MANUAL
+  AI_DRAFT
+  USER_VERIFIED
+  TEAM_VERIFIED
+  ADMIN_VERIFIED
+  DEPRECATED
+}
+
+enum PortDirection {
+  INPUT
+  OUTPUT
+  BIDIRECTIONAL
+}
+
+enum PortSide {
+  LEFT
+  RIGHT
+  TOP
+  BOTTOM
+  FRONT
+  REAR
+}
+
+enum DrawingPageType {
+  AUDIO
+  VIDEO
+  CONTROL
+  NETWORK
+  POWER
+  RACK
+  GENERAL
+}
+
+enum CableStatus {
+  DESIGNED
+  PULLED
+  TERMINATED
+  TESTED
+  VERIFIED
+}
+
+enum RackNumberingDirection {
+  BOTTOM_UP
+  TOP_DOWN
+}
+
+enum RackSide {
+  FRONT
+  REAR
+}
+
+model Organization {
+  id        String               @id @default(cuid())
+  name      String
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  members   OrganizationMember[]
+  projects  Project[]
+}
+
+model User {
+  id           String               @id @default(cuid())
+  clerkUserId  String?              @unique
+  email        String?              @unique
+  name         String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  memberships  OrganizationMember[]
+}
+
+model OrganizationMember {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrganizationRole @default(EDITOR)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model Project {
+  id              String            @id @default(cuid())
+  organizationId  String?
+  name            String
+  clientName      String?
+  projectNumber   String?
+  description     String?
+  status          ProjectStatus     @default(DRAFT)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  organization    Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  locations       ProjectLocation[]
+  deviceInstances DeviceInstance[]
+  drawingPages    DrawingPage[]
+  cables          Cable[]
+  racks           Rack[]
+  revisions       Revision[]
+
+  @@index([organizationId])
+}
+
+model ProjectLocation {
+  id            String           @id @default(cuid())
+  projectId     String
+  name          String
+  description   String?
+  sortOrder     Int              @default(0)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  devices       DeviceInstance[]
+  fromCables    Cable[]          @relation("CableFromLocation")
+  toCables      Cable[]          @relation("CableToLocation")
+  racks         Rack[]
+
+  @@index([projectId])
+}
+
+model Manufacturer {
+  id               String            @id @default(cuid())
+  name             String            @unique
+  website          String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  productTemplates ProductTemplate[]
+}
+
+model ConnectorType {
+  id                       String                @id @default(cuid())
+  name                     String                @unique
+  description              String?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  productPortTemplates     ProductPortTemplate[]
+  devicePortInstances      DevicePortInstance[]
+  defaultCableTypeA        CableType[]            @relation("CableTypeDefaultConnectorA")
+  defaultCableTypeB        CableType[]            @relation("CableTypeDefaultConnectorB")
+  cableConnectorA          Cable[]                @relation("CableConnectorA")
+  cableConnectorB          Cable[]                @relation("CableConnectorB")
+}
+
+model SignalType {
+  id                   String                @id @default(cuid())
+  name                 String                @unique
+  description          String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  productPortTemplates ProductPortTemplate[]
+  devicePortInstances  DevicePortInstance[]
+}
+
+model CableType {
+  id                  String         @id @default(cuid())
+  name                String         @unique
+  description         String?
+  defaultConnectorAId String?
+  defaultConnectorBId String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  defaultConnectorA   ConnectorType? @relation("CableTypeDefaultConnectorA", fields: [defaultConnectorAId], references: [id], onDelete: SetNull)
+  defaultConnectorB   ConnectorType? @relation("CableTypeDefaultConnectorB", fields: [defaultConnectorBId], references: [id], onDelete: SetNull)
+  cables              Cable[]
+}
+
+model ProductTemplate {
+  id                 String                @id @default(cuid())
+  manufacturerId     String?
+  name               String
+  model              String
+  category           String?
+  rackUnits          Int?
+  depthInches        Float?
+  powerWatts         Float?
+  notes              String?
+  verificationStatus VerificationStatus    @default(MANUAL)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  manufacturer       Manufacturer?         @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
+  ports              ProductPortTemplate[]
+  deviceInstances    DeviceInstance[]
+
+  @@index([manufacturerId])
+  @@index([model])
+}
+
+model ProductPortTemplate {
+  id                String           @id @default(cuid())
+  productTemplateId String
+  name              String
+  connectorTypeId   String
+  signalTypeId      String
+  direction         PortDirection
+  side              PortSide
+  sortOrder         Int              @default(0)
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  productTemplate   ProductTemplate  @relation(fields: [productTemplateId], references: [id], onDelete: Cascade)
+  connectorType     ConnectorType    @relation(fields: [connectorTypeId], references: [id])
+  signalType        SignalType       @relation(fields: [signalTypeId], references: [id])
+  devicePorts       DevicePortInstance[]
+
+  @@index([productTemplateId])
+}
+
+model DeviceInstance {
+  id                String               @id @default(cuid())
+  projectId         String
+  productTemplateId String
+  locationId        String?
+  tag               String
+  displayName       String?
+  rackId            String?
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  project           Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  productTemplate   ProductTemplate      @relation(fields: [productTemplateId], references: [id])
+  location          ProjectLocation?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  rack              Rack?                @relation("DevicePrimaryRack", fields: [rackId], references: [id], onDelete: SetNull)
+  ports             DevicePortInstance[]
+  drawingNodes      DrawingNode[]
+  mountedItems      RackMountedItem[]
+
+  @@unique([projectId, tag])
+  @@index([productTemplateId])
+  @@index([locationId])
+}
+
+model DevicePortInstance {
+  id                    String               @id @default(cuid())
+  deviceInstanceId      String
+  productPortTemplateId String?
+  name                  String
+  connectorTypeId       String
+  signalTypeId          String
+  direction             PortDirection
+  side                  PortSide
+  sortOrder             Int                  @default(0)
+  notes                 String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  deviceInstance        DeviceInstance       @relation(fields: [deviceInstanceId], references: [id], onDelete: Cascade)
+  productPortTemplate   ProductPortTemplate? @relation(fields: [productPortTemplateId], references: [id], onDelete: SetNull)
+  connectorType         ConnectorType        @relation(fields: [connectorTypeId], references: [id])
+  signalType            SignalType           @relation(fields: [signalTypeId], references: [id])
+  sourceCables          Cable[]              @relation("CableSourcePort")
+  destinationCables     Cable[]              @relation("CableDestinationPort")
+
+  @@index([deviceInstanceId])
+}
+
+model DrawingPage {
+  id          String          @id @default(cuid())
+  projectId   String
+  name        String
+  type        DrawingPageType @default(GENERAL)
+  sheetNumber String?
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  nodes       DrawingNode[]
+  edges       DrawingEdge[]
+
+  @@index([projectId])
+}
+
+model DrawingNode {
+  id               String         @id @default(cuid())
+  drawingPageId    String
+  deviceInstanceId String
+  x                Float          @default(0)
+  y                Float          @default(0)
+  width            Float?
+  height           Float?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  drawingPage      DrawingPage    @relation(fields: [drawingPageId], references: [id], onDelete: Cascade)
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id], onDelete: Cascade)
+  sourceEdges      DrawingEdge[]   @relation("DrawingEdgeSourceNode")
+  targetEdges      DrawingEdge[]   @relation("DrawingEdgeTargetNode")
+
+  @@unique([drawingPageId, deviceInstanceId])
+  @@index([deviceInstanceId])
+}
+
+model Cable {
+  id                      String              @id @default(cuid())
+  projectId               String
+  cableNumber             String
+  sourceDevicePortId      String
+  destinationDevicePortId String
+  cableTypeId             String?
+  connectorAId            String?
+  connectorBId            String?
+  fromLocationId          String?
+  toLocationId            String?
+  estimatedLength         Float?
+  status                  CableStatus         @default(DESIGNED)
+  notes                   String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  project                 Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceDevicePort        DevicePortInstance  @relation("CableSourcePort", fields: [sourceDevicePortId], references: [id])
+  destinationDevicePort   DevicePortInstance  @relation("CableDestinationPort", fields: [destinationDevicePortId], references: [id])
+  cableType               CableType?          @relation(fields: [cableTypeId], references: [id], onDelete: SetNull)
+  connectorA              ConnectorType?      @relation("CableConnectorA", fields: [connectorAId], references: [id], onDelete: SetNull)
+  connectorB              ConnectorType?      @relation("CableConnectorB", fields: [connectorBId], references: [id], onDelete: SetNull)
+  fromLocation            ProjectLocation?    @relation("CableFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocation              ProjectLocation?    @relation("CableToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
+  drawingEdges            DrawingEdge[]
+
+  @@unique([projectId, cableNumber])
+  @@index([sourceDevicePortId])
+  @@index([destinationDevicePortId])
+}
+
+model DrawingEdge {
+  id            String      @id @default(cuid())
+  drawingPageId String
+  cableId       String
+  sourceNodeId  String
+  targetNodeId  String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  drawingPage   DrawingPage @relation(fields: [drawingPageId], references: [id], onDelete: Cascade)
+  cable         Cable       @relation(fields: [cableId], references: [id], onDelete: Cascade)
+  sourceNode    DrawingNode @relation("DrawingEdgeSourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode    DrawingNode @relation("DrawingEdgeTargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@index([drawingPageId])
+  @@index([cableId])
+}
+
+model Rack {
+  id                 String                 @id @default(cuid())
+  projectId          String
+  locationId         String?
+  name               String
+  heightRu           Int
+  numberingDirection RackNumberingDirection @default(BOTTOM_UP)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  location           ProjectLocation?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  primaryDevices     DeviceInstance[]       @relation("DevicePrimaryRack")
+  mountedItems       RackMountedItem[]
+
+  @@index([projectId])
+}
+
+model RackMountedItem {
+  id               String         @id @default(cuid())
+  rackId           String
+  deviceInstanceId String
+  startRu          Int
+  heightRu         Int
+  side             RackSide       @default(FRONT)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  rack             Rack           @relation(fields: [rackId], references: [id], onDelete: Cascade)
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([rackId])
+  @@index([deviceInstanceId])
+}
+
+model Revision {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}

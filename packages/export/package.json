@@ -1,0 +1,7 @@
+{
+  "name": "@wireframe-av/export",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/csvExport.ts",
+  "types": "src/csvExport.ts"
+}
