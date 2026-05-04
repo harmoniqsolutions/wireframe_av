@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Filter, Trash2 } from "lucide-react";
+import { Filter, Pencil, Trash2 } from "lucide-react";
 import { Prisma, prisma } from "@wireframe-av/db";
+import { AutoSubmitSelect } from "@/components/ui/auto-submit-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,13 +17,32 @@ export default async function ProjectEquipmentPage({
   searchParams
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ productQ?: string; manufacturerId?: string; category?: string }>;
+  searchParams: Promise<{
+    equipmentCategory?: string;
+    equipmentLocationId?: string;
+    productQ?: string;
+    manufacturerId?: string;
+    category?: string;
+  }>;
 }) {
   const { projectId } = await params;
   const filters = await searchParams;
+  const selectedEquipmentCategory = filters.equipmentCategory?.trim();
+  const selectedEquipmentLocationId = filters.equipmentLocationId?.trim();
   const productQ = filters.productQ?.trim();
   const selectedManufacturerId = filters.manufacturerId?.trim();
   const selectedCategory = filters.category?.trim();
+  const deviceWhere: Prisma.DeviceInstanceWhereInput = {
+    AND: [
+      { projectId },
+      selectedEquipmentCategory ? { productTemplate: { category: selectedEquipmentCategory } } : {},
+      selectedEquipmentLocationId === "unassigned"
+        ? { locationId: null }
+        : selectedEquipmentLocationId
+          ? { locationId: selectedEquipmentLocationId }
+          : {}
+    ]
+  };
   const productWhere: Prisma.ProductTemplateWhereInput = {
     AND: [
       productQ
@@ -42,7 +62,7 @@ export default async function ProjectEquipmentPage({
 
   const [devices, products, locations, manufacturers, categoryRows] = await Promise.all([
     prisma.deviceInstance.findMany({
-      where: { projectId },
+      where: deviceWhere,
       orderBy: { tag: "asc" },
       include: {
         productTemplate: { include: { manufacturer: true } },
@@ -72,7 +92,7 @@ export default async function ProjectEquipmentPage({
   const addDevice = addDeviceInstanceToProject.bind(null, projectId);
 
   return (
-    <div className="grid grid-cols-[1fr_360px] gap-6">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <section>
         <div className="mb-5 flex items-end justify-between">
           <div>
@@ -84,6 +104,40 @@ export default async function ProjectEquipmentPage({
             <div>{devices.reduce((total, device) => total + device.ports.length, 0)} snapshotted ports</div>
           </div>
         </div>
+
+        <Panel className="mb-5 p-4">
+          <form className="grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end" action={`/projects/${projectId}/equipment`}>
+            <div className="space-y-2">
+              <Label htmlFor="equipmentLocationId">Equipment Location</Label>
+              <AutoSubmitSelect id="equipmentLocationId" name="equipmentLocationId" defaultValue={selectedEquipmentLocationId ?? ""}>
+                <option value="">All locations</option>
+                <option value="unassigned">Unassigned</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </AutoSubmitSelect>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="equipmentCategory">Equipment Category</Label>
+              <AutoSubmitSelect id="equipmentCategory" name="equipmentCategory" defaultValue={selectedEquipmentCategory ?? ""}>
+                <option value="">All categories</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </AutoSubmitSelect>
+            </div>
+            <Link
+              href={`/projects/${projectId}/equipment`}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-transparent px-4 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+            >
+              Clear
+            </Link>
+          </form>
+        </Panel>
 
         <Panel className="overflow-hidden">
           <Table>
@@ -116,12 +170,21 @@ export default async function ProjectEquipmentPage({
                         {device.ports.map((port) => `${port.name} (${port.connectorType.name}, ${port.signalType.name})`).join("; ")}
                       </div>
                     </Td>
-                    <Td className="text-right">
-                      <form action={deleteDevice}>
+                    <Td>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/projects/${projectId}/equipment/${device.id}`}
+                          className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent px-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                          aria-label={`Edit ${device.tag}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Link>
+                        <form action={deleteDevice}>
                         <Button type="submit" variant="ghost" size="sm" aria-label={`Delete ${device.tag}`}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      </form>
+                        </form>
+                      </div>
                     </Td>
                   </tr>
                 );
@@ -150,29 +213,26 @@ export default async function ProjectEquipmentPage({
           </div>
           <div className="space-y-2">
             <Label htmlFor="manufacturerId">Manufacturer</Label>
-            <Select id="manufacturerId" name="manufacturerId" defaultValue={selectedManufacturerId ?? ""}>
+            <AutoSubmitSelect id="manufacturerId" name="manufacturerId" defaultValue={selectedManufacturerId ?? ""}>
               <option value="">All manufacturers</option>
               {manufacturers.map((manufacturer) => (
                 <option key={manufacturer.id} value={manufacturer.id}>
                   {manufacturer.name}
                 </option>
               ))}
-            </Select>
+            </AutoSubmitSelect>
           </div>
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
-            <Select id="category" name="category" defaultValue={selectedCategory ?? ""}>
+            <AutoSubmitSelect id="category" name="category" defaultValue={selectedCategory ?? ""}>
               <option value="">All categories</option>
               {categories.map((category) => (
                 <option key={category} value={category}>
                   {category}
                 </option>
               ))}
-            </Select>
+            </AutoSubmitSelect>
           </div>
-          <Button type="submit" variant="secondary" className="w-full">
-            Apply Filters
-          </Button>
         </form>
         <form action={addDevice} className="space-y-4">
           <h3 className="text-sm font-semibold text-neutral-950">Add Device</h3>

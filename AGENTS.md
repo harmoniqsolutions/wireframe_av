@@ -297,11 +297,18 @@ Equipment page supports:
 
 - List devices
 - Add device from product library
+- Filter project equipment by location and category
 - Filter product templates by search, manufacturer, category before adding
+- Dropdown filters submit instantly when changed; no separate Apply button
 - Select location
 - Enter tag, display name, notes
 - Tag is normalized to uppercase
 - Device creation snapshots all current template ports to `DevicePortInstance`
+- Open an already-added equipment item at `/projects/[projectId]/equipment/[deviceInstanceId]`
+- Edit equipment tag, display name, location, and notes
+- Add, edit, and delete project-specific snapshot ports on existing equipment
+- Device port edits detach the snapshot from the original `ProductPortTemplate` by clearing `productPortTemplateId`
+- Deleting a device or project-specific port deletes connected `Cable` rows first, which cascades linked schematic `DrawingEdge` rows
 
 Professional tag prefixes shown in UI:
 
@@ -309,12 +316,19 @@ Professional tag prefixes shown in UI:
 DSP, AMP, SW, DISP, MIC, RX, TX, CAM, SPK
 ```
 
+Important files:
+
+- `apps/web/app/projects/[projectId]/equipment/page.tsx`
+- `apps/web/app/projects/[projectId]/equipment/[deviceInstanceId]/page.tsx`
+- `apps/web/features/devices/actions.ts`
+- `apps/web/components/ui/auto-submit-select.tsx`
+
 Important next opportunities:
 
 - Better tag numbering helper, e.g. auto-suggest next `DSP-001`.
-- Device edit form.
 - Bulk add devices.
-- Location-aware summaries.
+- Location-aware summaries and grouped equipment views.
+- Confirmation UI before deleting equipment, ports, or connected cables.
 
 ## Schematics Status
 
