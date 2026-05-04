@@ -15,7 +15,7 @@ import {
   updateProductPortTemplate,
   updateProductTemplate
 } from "@/features/products/actions";
-import { portDirections, portSides } from "@/lib/enums";
+import { portDirections, portSides, verificationStatuses } from "@/lib/enums";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,9 @@ export default async function ProductTemplatePage({ params }: { params: Promise<
             Product Library
           </Link>
           <h1 className="mt-1 text-2xl font-semibold text-neutral-950">{product.name}</h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            {[product.manufacturer?.name, product.model, product.verificationStatus.replaceAll("_", " ")].filter(Boolean).join(" / ")}
+          </p>
         </div>
       </div>
 
@@ -65,6 +68,16 @@ export default async function ProductTemplatePage({ params }: { params: Promise<
                 <Label htmlFor="model">Model</Label>
                 <Input id="model" name="model" required defaultValue={product.model} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="verificationStatus">Verification Status</Label>
+              <Select id="verificationStatus" name="verificationStatus" defaultValue={product.verificationStatus}>
+                {verificationStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
@@ -102,6 +115,7 @@ export default async function ProductTemplatePage({ params }: { params: Promise<
                   <Th>Direction</Th>
                   <Th>Side</Th>
                   <Th>Sort</Th>
+                  <Th>Notes</Th>
                   <Th />
                 </tr>
               </thead>
@@ -111,8 +125,8 @@ export default async function ProductTemplatePage({ params }: { params: Promise<
                   const deletePort = deleteProductPortTemplate.bind(null, product.id, port.id);
                   return (
                     <tr key={port.id}>
-                      <Td colSpan={7}>
-                        <form action={updatePort} className="grid grid-cols-[1.1fr_1.3fr_1.5fr_1fr_1fr_64px_36px] gap-2">
+                      <Td colSpan={8}>
+                        <form action={updatePort} className="grid grid-cols-[1fr_1.2fr_1.35fr_0.9fr_0.8fr_60px_1fr_auto_auto] gap-2">
                           <Input name="name" defaultValue={port.name} aria-label="Port name" />
                           <Select name="connectorTypeId" defaultValue={port.connectorTypeId} aria-label="Connector type">
                             {connectorTypes.map((connector) => (
@@ -143,27 +157,32 @@ export default async function ProductTemplatePage({ params }: { params: Promise<
                             ))}
                           </Select>
                           <Input name="sortOrder" type="number" defaultValue={port.sortOrder} aria-label="Sort order" />
-                          <div className="flex gap-1">
-                            <Button type="submit" size="sm" variant="secondary">
-                              Save
-                            </Button>
-                          </div>
-                        </form>
-                        <form action={deletePort} className="mt-2">
-                          <Button type="submit" size="sm" variant="ghost" aria-label={`Delete ${port.name}`}>
+                          <Input name="notes" defaultValue={port.notes ?? ""} placeholder="Notes" aria-label="Port notes" />
+                          <Button type="submit" size="sm" variant="secondary">
+                            Save
+                          </Button>
+                          <Button form={`delete-port-${port.id}`} type="submit" size="sm" variant="ghost" aria-label={`Delete ${port.name}`}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </form>
+                        <form id={`delete-port-${port.id}`} action={deletePort} />
                       </Td>
                     </tr>
                   );
                 })}
+                {!product.ports.length && (
+                  <tr>
+                    <Td colSpan={8} className="py-8 text-center text-neutral-500">
+                      No port templates yet.
+                    </Td>
+                  </tr>
+                )}
               </tbody>
             </Table>
           </Panel>
 
           <Panel className="p-4">
-            <form action={createPort} className="grid grid-cols-[1fr_1.2fr_1.4fr_1fr_1fr_80px_auto] gap-3">
+            <form action={createPort} className="grid grid-cols-[1fr_1.15fr_1.3fr_0.9fr_0.85fr_72px_72px_1fr_auto] gap-3">
               <Input name="name" required placeholder="Output 1" aria-label="New port name" />
               <Select name="connectorTypeId" required aria-label="Connector type">
                 {connectorTypes.map((connector) => (
@@ -194,6 +213,8 @@ export default async function ProductTemplatePage({ params }: { params: Promise<
                 ))}
               </Select>
               <Input name="sortOrder" type="number" defaultValue={0} aria-label="Sort order" />
+              <Input name="quantity" type="number" min="1" max="48" defaultValue={1} aria-label="Quantity" />
+              <Input name="notes" placeholder="Notes" aria-label="New port notes" />
               <Button type="submit">Add Port</Button>
             </form>
           </Panel>

@@ -35,9 +35,15 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
   return (
     <div className="grid grid-cols-[1fr_360px] gap-6">
       <section>
-        <div className="mb-5">
-          <h2 className="text-2xl font-semibold text-neutral-950">Equipment</h2>
-          <p className="mt-1 text-sm text-neutral-500">Device instances are project snapshots of product templates and ports.</p>
+        <div className="mb-5 flex items-end justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-neutral-950">Equipment</h2>
+            <p className="mt-1 text-sm text-neutral-500">Device instances are project snapshots of product templates and ports.</p>
+          </div>
+          <div className="text-right text-xs text-neutral-500">
+            <div className="font-medium text-neutral-700">{devices.length} project devices</div>
+            <div>{devices.reduce((total, device) => total + device.ports.length, 0)} snapshotted ports</div>
+          </div>
         </div>
 
         <Panel className="overflow-hidden">
@@ -45,10 +51,11 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
             <thead>
               <tr>
                 <Th>Tag</Th>
-                <Th>Device</Th>
-                <Th>Location</Th>
-                <Th>Ports</Th>
-                <Th />
+                  <Th>Device</Th>
+                  <Th>Category</Th>
+                  <Th>Location</Th>
+                  <Th>Ports</Th>
+                  <Th />
               </tr>
             </thead>
             <tbody>
@@ -63,6 +70,7 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
                         {[device.productTemplate.manufacturer?.name, device.productTemplate.model].filter(Boolean).join(" ")}
                       </div>
                     </Td>
+                    <Td>{device.productTemplate.category ?? "Uncategorized"}</Td>
                     <Td>{device.location?.name ?? "Unassigned"}</Td>
                     <Td>
                       <div className="max-w-lg text-xs text-neutral-600">
@@ -81,7 +89,7 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
               })}
               {!devices.length && (
                 <tr>
-                  <Td colSpan={5} className="py-8 text-center text-neutral-500">
+                  <Td colSpan={6} className="py-8 text-center text-neutral-500">
                     No devices in this project yet.
                   </Td>
                 </tr>
@@ -104,7 +112,7 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
             <Select id="productTemplateId" name="productTemplateId" required disabled={!products.length}>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {[product.manufacturer?.name, product.model, `(${product._count.ports} ports)`].filter(Boolean).join(" ")}
+                  {[product.manufacturer?.name, product.model, product.category, `(${product._count.ports} ports)`].filter(Boolean).join(" / ")}
                 </option>
               ))}
             </Select>
@@ -112,7 +120,7 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="tag">Tag</Label>
-              <Input id="tag" name="tag" required placeholder="DSP-001" />
+              <Input id="tag" name="tag" required placeholder="DSP-001" autoCapitalize="characters" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="locationId">Location</Label>
@@ -133,6 +141,9 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <Input id="notes" name="notes" placeholder="Rack room A" />
+          </div>
+          <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
+            Common tag prefixes: DSP, AMP, SW, DISP, MIC, RX, TX, CAM, SPK.
           </div>
           <Button type="submit" className="w-full" disabled={!products.length}>
             Add Device

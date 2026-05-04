@@ -24,6 +24,20 @@ function normalizeCableEndpoints<T extends { direction: string }>(sourcePort: T,
   return { sourcePort, destinationPort: targetPort, reversed: false };
 }
 
+function inferCableTypeName(connectorName: string, signalName: string) {
+  if (connectorName === "RJ45" && (signalName === "Network Data" || signalName === "Dante/AES67" || signalName === "AV-over-IP")) return "CAT6A";
+  if (connectorName === "HDMI Type A" && signalName === "HDMI Video") return "HDMI";
+  if (connectorName === "BNC" && signalName === "SDI Video") return "SDI Coax";
+  if ((connectorName === "3-pin Euroblock" || connectorName === "XLR 3-pin") && signalName === "Analog Audio Balanced") {
+    return "Balanced Audio Cable";
+  }
+  if ((connectorName === "NL2" || connectorName === "NL4") && signalName === "Speaker Level Audio") return "Speaker Cable 12/2";
+  if ((connectorName === "USB-A" || connectorName === "USB-B" || connectorName === "USB-C") && signalName === "USB") return "USB Cable";
+  if ((connectorName === "LC Fiber" || connectorName === "SC Fiber" || connectorName === "ST Fiber") && signalName === "Fiber") return "Duplex Fiber";
+  if ((connectorName === "IEC C14" || connectorName === "NEMA 5-15") && signalName === "AC Power") return "AC Power Cable";
+  return null;
+}
+
 export async function POST(request: NextRequest, context: { params: Promise<{ drawingPageId: string }> }) {
   await getCurrentContext();
   const { drawingPageId } = await context.params;
@@ -71,6 +85,30 @@ export async function POST(request: NextRequest, context: { params: Promise<{ dr
   const normalized = normalizeCableEndpoints(sourcePort, targetPort);
   const sourceNodeId = normalized.reversed ? body.targetNodeId : body.sourceNodeId;
   const targetNodeId = normalized.reversed ? body.sourceNodeId : body.targetNodeId;
+  const inferredCableTypeName = inferCableTypeName(normalized.sourcePort.connectorType.name, normalized.sourcePort.signalType.name);
+  const inferredCableType = inferredCableTypeName
+    ? await prisma.cableType.findUnique({ where: { name: inferredCableTypeName }, select: { id: true } })
+    : null;
+
+  const existingCable = await prisma.cable.findFirst({
+    where: {
+      projectId: page.projectId,
+      sourceDevicePortId: normalized.sourcePort.id,
+      destinationDevicePortId: normalized.destinationPort.id
+    },
+    select: { cableNumber: true }
+  });
+
+  if (existingCable) {
+    return NextResponse.json(
+      {
+        allowed: false,
+        severity: "error",
+        message: `Connection already exists as ${existingCable.cableNumber}.`
+      },
+      { status: 400 }
+    );
+  }
 
   const edge = await prisma.$transaction(async (tx) => {
     const existingNumbers = await tx.cable.findMany({
@@ -86,6 +124,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ dr
         destinationDevicePortId: normalized.destinationPort.id,
         connectorAId: normalized.sourcePort.connectorTypeId,
         connectorBId: normalized.destinationPort.connectorTypeId,
+        cableTypeId: inferredCableType?.id,
         fromLocationId: normalized.sourcePort.deviceInstance.locationId,
         toLocationId: normalized.destinationPort.deviceInstance.locationId,
         status: "DESIGNED"

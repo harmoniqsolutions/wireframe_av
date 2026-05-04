@@ -131,97 +131,286 @@ async function main() {
   const euroblock = await prisma.connectorType.findUniqueOrThrow({ where: { name: "3-pin Euroblock" } });
   const rj45 = await prisma.connectorType.findUniqueOrThrow({ where: { name: "RJ45" } });
   const nl4 = await prisma.connectorType.findUniqueOrThrow({ where: { name: "NL4" } });
+  const hdmi = await prisma.connectorType.findUniqueOrThrow({ where: { name: "HDMI Type A" } });
+  const xlr3 = await prisma.connectorType.findUniqueOrThrow({ where: { name: "XLR 3-pin" } });
+  const iec = await prisma.connectorType.findUniqueOrThrow({ where: { name: "IEC C14" } });
+  const usbc = await prisma.connectorType.findUniqueOrThrow({ where: { name: "USB-C" } });
+  const lcFiber = await prisma.connectorType.findUniqueOrThrow({ where: { name: "LC Fiber" } });
   const balancedAudio = await prisma.signalType.findUniqueOrThrow({ where: { name: "Analog Audio Balanced" } });
   const network = await prisma.signalType.findUniqueOrThrow({ where: { name: "Network Data" } });
+  const dante = await prisma.signalType.findUniqueOrThrow({ where: { name: "Dante/AES67" } });
   const speaker = await prisma.signalType.findUniqueOrThrow({ where: { name: "Speaker Level Audio" } });
+  const hdmiVideo = await prisma.signalType.findUniqueOrThrow({ where: { name: "HDMI Video" } });
+  const acPower = await prisma.signalType.findUniqueOrThrow({ where: { name: "AC Power" } });
+  const usb = await prisma.signalType.findUniqueOrThrow({ where: { name: "USB" } });
+  const fiber = await prisma.signalType.findUniqueOrThrow({ where: { name: "Fiber" } });
 
-  const dsp = await prisma.productTemplate.upsert({
-    where: { id: "seed-generic-dsp" },
-    update: {},
-    create: {
+  const productSeeds = [
+    {
       id: "seed-generic-dsp",
-      manufacturerId: generic.id,
       name: "Generic DSP",
-      model: "DSP-1",
+      model: "DSP-8X8",
       category: "DSP",
       rackUnits: 1,
-      verificationStatus: "MANUAL"
-    }
-  });
-
-  const amplifier = await prisma.productTemplate.upsert({
-    where: { id: "seed-generic-amplifier" },
-    update: {},
-    create: {
+      notes: "Eight-input/eight-output DSP with Dante and management network ports.",
+      ports: [
+        ...Array.from({ length: 8 }, (_, index) => ({
+          id: `seed-dsp-input-${index + 1}`,
+          name: `Input ${index + 1}`,
+          connectorTypeId: euroblock.id,
+          signalTypeId: balancedAudio.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.LEFT,
+          sortOrder: index + 1
+        })),
+        ...Array.from({ length: 8 }, (_, index) => ({
+          id: `seed-dsp-output-${index + 1}`,
+          name: `Output ${index + 1}`,
+          connectorTypeId: euroblock.id,
+          signalTypeId: balancedAudio.id,
+          direction: PortDirection.OUTPUT,
+          side: PortSide.RIGHT,
+          sortOrder: index + 21
+        })),
+        {
+          id: "seed-dsp-dante",
+          name: "Dante",
+          connectorTypeId: rj45.id,
+          signalTypeId: dante.id,
+          direction: PortDirection.BIDIRECTIONAL,
+          side: PortSide.TOP,
+          sortOrder: 41
+        },
+        {
+          id: "seed-dsp-lan",
+          name: "Control LAN",
+          connectorTypeId: rj45.id,
+          signalTypeId: network.id,
+          direction: PortDirection.BIDIRECTIONAL,
+          side: PortSide.TOP,
+          sortOrder: 42
+        },
+        {
+          id: "seed-dsp-power",
+          name: "AC In",
+          connectorTypeId: iec.id,
+          signalTypeId: acPower.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.REAR,
+          sortOrder: 90
+        }
+      ]
+    },
+    {
       id: "seed-generic-amplifier",
-      manufacturerId: generic.id,
       name: "Generic Amplifier",
-      model: "AMP-1",
+      model: "AMP-2CH",
       category: "Amplifier",
       rackUnits: 2,
-      verificationStatus: "MANUAL"
-    }
-  });
-
-  const seedPorts = [
-    {
-      id: "seed-dsp-input-1",
-      productTemplateId: dsp.id,
-      name: "Input 1",
-      connectorTypeId: euroblock.id,
-      signalTypeId: balancedAudio.id,
-      direction: PortDirection.INPUT,
-      side: PortSide.LEFT,
-      sortOrder: 1
+      notes: "Two-channel rack amplifier with balanced inputs and NL4 loudspeaker outputs.",
+      ports: [
+        ...Array.from({ length: 2 }, (_, index) => ({
+          id: `seed-amp-input-${index + 1}`,
+          name: `Input ${index + 1}`,
+          connectorTypeId: euroblock.id,
+          signalTypeId: balancedAudio.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.LEFT,
+          sortOrder: index + 1
+        })),
+        ...Array.from({ length: 2 }, (_, index) => ({
+          id: `seed-amp-speaker-out-${index + 1}`,
+          name: `Speaker Out ${index + 1}`,
+          connectorTypeId: nl4.id,
+          signalTypeId: speaker.id,
+          direction: PortDirection.OUTPUT,
+          side: PortSide.RIGHT,
+          sortOrder: index + 11
+        })),
+        {
+          id: "seed-amp-power",
+          name: "AC In",
+          connectorTypeId: iec.id,
+          signalTypeId: acPower.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.REAR,
+          sortOrder: 90
+        }
+      ]
     },
     {
-      id: "seed-dsp-output-1",
-      productTemplateId: dsp.id,
-      name: "Output 1",
-      connectorTypeId: euroblock.id,
-      signalTypeId: balancedAudio.id,
-      direction: PortDirection.OUTPUT,
-      side: PortSide.RIGHT,
-      sortOrder: 2
+      id: "seed-generic-network-switch",
+      name: "Generic Network Switch",
+      model: "SW-24P",
+      category: "Network",
+      rackUnits: 1,
+      notes: "Managed AV network switch with copper access ports and fiber uplinks.",
+      ports: [
+        ...Array.from({ length: 24 }, (_, index) => ({
+          id: `seed-switch-rj45-${index + 1}`,
+          name: `Port ${index + 1}`,
+          connectorTypeId: rj45.id,
+          signalTypeId: network.id,
+          direction: PortDirection.BIDIRECTIONAL,
+          side: PortSide.RIGHT,
+          sortOrder: index + 1
+        })),
+        ...Array.from({ length: 2 }, (_, index) => ({
+          id: `seed-switch-sfp-${index + 1}`,
+          name: `SFP ${index + 1}`,
+          connectorTypeId: lcFiber.id,
+          signalTypeId: fiber.id,
+          direction: PortDirection.BIDIRECTIONAL,
+          side: PortSide.TOP,
+          sortOrder: index + 41
+        })),
+        {
+          id: "seed-switch-power",
+          name: "AC In",
+          connectorTypeId: iec.id,
+          signalTypeId: acPower.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.REAR,
+          sortOrder: 90
+        }
+      ]
     },
     {
-      id: "seed-dsp-lan",
-      productTemplateId: dsp.id,
-      name: "LAN",
-      connectorTypeId: rj45.id,
-      signalTypeId: network.id,
-      direction: PortDirection.BIDIRECTIONAL,
-      side: PortSide.TOP,
-      sortOrder: 3
+      id: "seed-generic-hdmi-display",
+      name: "Generic HDMI Display",
+      model: "DISP-55",
+      category: "Display",
+      rackUnits: null,
+      notes: "Commercial display with HDMI, USB-C, LAN, and AC power.",
+      ports: [
+        {
+          id: "seed-display-hdmi-1",
+          name: "HDMI 1",
+          connectorTypeId: hdmi.id,
+          signalTypeId: hdmiVideo.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.LEFT,
+          sortOrder: 1
+        },
+        {
+          id: "seed-display-hdmi-2",
+          name: "HDMI 2",
+          connectorTypeId: hdmi.id,
+          signalTypeId: hdmiVideo.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.LEFT,
+          sortOrder: 2
+        },
+        {
+          id: "seed-display-usbc",
+          name: "USB-C",
+          connectorTypeId: usbc.id,
+          signalTypeId: usb.id,
+          direction: PortDirection.BIDIRECTIONAL,
+          side: PortSide.BOTTOM,
+          sortOrder: 3
+        },
+        {
+          id: "seed-display-lan",
+          name: "LAN",
+          connectorTypeId: rj45.id,
+          signalTypeId: network.id,
+          direction: PortDirection.BIDIRECTIONAL,
+          side: PortSide.TOP,
+          sortOrder: 4
+        },
+        {
+          id: "seed-display-power",
+          name: "AC In",
+          connectorTypeId: iec.id,
+          signalTypeId: acPower.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.REAR,
+          sortOrder: 90
+        }
+      ]
     },
     {
-      id: "seed-amp-input-1",
-      productTemplateId: amplifier.id,
-      name: "Input 1",
-      connectorTypeId: euroblock.id,
-      signalTypeId: balancedAudio.id,
-      direction: PortDirection.INPUT,
-      side: PortSide.LEFT,
-      sortOrder: 1
-    },
-    {
-      id: "seed-amp-speaker-out-1",
-      productTemplateId: amplifier.id,
-      name: "Speaker Out 1",
-      connectorTypeId: nl4.id,
-      signalTypeId: speaker.id,
-      direction: PortDirection.OUTPUT,
-      side: PortSide.RIGHT,
-      sortOrder: 2
+      id: "seed-generic-wireless-mic-receiver",
+      name: "Generic Wireless Microphone Receiver",
+      model: "WMR-4",
+      category: "Wireless Microphone",
+      rackUnits: 1,
+      notes: "Four-channel receiver with balanced outputs and network management.",
+      ports: [
+        ...Array.from({ length: 4 }, (_, index) => ({
+          id: `seed-wmr-xlr-out-${index + 1}`,
+          name: `Audio Out ${index + 1}`,
+          connectorTypeId: xlr3.id,
+          signalTypeId: balancedAudio.id,
+          direction: PortDirection.OUTPUT,
+          side: PortSide.RIGHT,
+          sortOrder: index + 1
+        })),
+        {
+          id: "seed-wmr-lan",
+          name: "LAN",
+          connectorTypeId: rj45.id,
+          signalTypeId: network.id,
+          direction: PortDirection.BIDIRECTIONAL,
+          side: PortSide.TOP,
+          sortOrder: 30
+        },
+        {
+          id: "seed-wmr-power",
+          name: "AC In",
+          connectorTypeId: iec.id,
+          signalTypeId: acPower.id,
+          direction: PortDirection.INPUT,
+          side: PortSide.REAR,
+          sortOrder: 90
+        }
+      ]
     }
   ];
 
-  for (const port of seedPorts) {
-    await prisma.productPortTemplate.upsert({
-      where: { id: port.id },
-      update: {},
-      create: port
+  for (const product of productSeeds) {
+    await prisma.productTemplate.upsert({
+      where: { id: product.id },
+      update: {
+        manufacturerId: generic.id,
+        name: product.name,
+        model: product.model,
+        category: product.category,
+        rackUnits: product.rackUnits,
+        notes: product.notes,
+        verificationStatus: "MANUAL"
+      },
+      create: {
+        id: product.id,
+        manufacturerId: generic.id,
+        name: product.name,
+        model: product.model,
+        category: product.category,
+        rackUnits: product.rackUnits,
+        notes: product.notes,
+        verificationStatus: "MANUAL"
+      }
     });
+
+    for (const port of product.ports) {
+      await prisma.productPortTemplate.upsert({
+        where: { id: port.id },
+        update: {
+          productTemplateId: product.id,
+          name: port.name,
+          connectorTypeId: port.connectorTypeId,
+          signalTypeId: port.signalTypeId,
+          direction: port.direction,
+          side: port.side,
+          sortOrder: port.sortOrder
+        },
+        create: {
+          ...port,
+          productTemplateId: product.id
+        }
+      });
+    }
   }
 }
 

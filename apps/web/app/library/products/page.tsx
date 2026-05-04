@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Panel } from "@/components/ui/panel";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createProductTemplate } from "@/features/products/actions";
 import { getCurrentContext } from "@/lib/context";
+import { verificationStatuses } from "@/lib/enums";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +45,7 @@ export default async function ProductLibraryPage() {
                   <p className="mt-1 text-sm text-neutral-600">{product.name}</p>
                   <div className="mt-3 flex gap-4 text-xs text-neutral-500">
                     <span>{product.category ?? "Uncategorized"}</span>
+                    <span>{product.verificationStatus.replaceAll("_", " ")}</span>
                     <span>{product._count.ports} ports</span>
                     <span>{product._count.deviceInstances} project devices</span>
                   </div>
@@ -51,6 +54,12 @@ export default async function ProductLibraryPage() {
               </div>
             </Link>
           ))}
+          {!products.length && (
+            <Panel className="px-5 py-10 text-center">
+              <h2 className="text-sm font-semibold text-neutral-950">No product templates yet</h2>
+              <p className="mt-1 text-sm text-neutral-500">Create reusable equipment stencils before adding devices to projects.</p>
+            </Panel>
+          )}
         </div>
       </section>
 
@@ -69,6 +78,16 @@ export default async function ProductLibraryPage() {
               <Label htmlFor="model">Model</Label>
               <Input id="model" name="model" required placeholder="DSP-1" />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="verificationStatus">Verification</Label>
+            <Select id="verificationStatus" name="verificationStatus" defaultValue="MANUAL">
+              {verificationStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status.replaceAll("_", " ")}
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>

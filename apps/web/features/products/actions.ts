@@ -15,6 +15,13 @@ function optionalNumber(value: FormDataEntryValue | null) {
   return text.length ? Number(text) : null;
 }
 
+function numberedPortName(name: string, index: number) {
+  if (index === 0) return name;
+  const match = name.match(/^(.*?)(\d+)$/);
+  if (!match) return `${name} ${index + 1}`;
+  return `${match[1]}${Number(match[2]) + index}`;
+}
+
 async function manufacturerIdFromForm(formData: FormData) {
   const manufacturerName = optionalText(formData.get("manufacturer"));
   if (!manufacturerName) return null;
@@ -35,7 +42,14 @@ export async function createProductTemplate(formData: FormData) {
       model: String(formData.get("model") ?? "").trim(),
       category: optionalText(formData.get("category")),
       rackUnits: optionalNumber(formData.get("rackUnits")),
-      notes: optionalText(formData.get("notes"))
+      notes: optionalText(formData.get("notes")),
+      verificationStatus: String(formData.get("verificationStatus") ?? "MANUAL") as
+        | "MANUAL"
+        | "AI_DRAFT"
+        | "USER_VERIFIED"
+        | "TEAM_VERIFIED"
+        | "ADMIN_VERIFIED"
+        | "DEPRECATED"
     }
   });
 
@@ -53,7 +67,14 @@ export async function updateProductTemplate(productId: string, formData: FormDat
       model: String(formData.get("model") ?? "").trim(),
       category: optionalText(formData.get("category")),
       rackUnits: optionalNumber(formData.get("rackUnits")),
-      notes: optionalText(formData.get("notes"))
+      notes: optionalText(formData.get("notes")),
+      verificationStatus: String(formData.get("verificationStatus") ?? "MANUAL") as
+        | "MANUAL"
+        | "AI_DRAFT"
+        | "USER_VERIFIED"
+        | "TEAM_VERIFIED"
+        | "ADMIN_VERIFIED"
+        | "DEPRECATED"
     }
   });
 
@@ -63,17 +84,24 @@ export async function updateProductTemplate(productId: string, formData: FormDat
 
 export async function createProductPortTemplate(productTemplateId: string, formData: FormData) {
   await getCurrentContext();
-  await prisma.productPortTemplate.create({
-    data: {
-      productTemplateId,
-      name: String(formData.get("name") ?? "").trim(),
-      connectorTypeId: String(formData.get("connectorTypeId")),
-      signalTypeId: String(formData.get("signalTypeId")),
-      direction: String(formData.get("direction")) as "INPUT" | "OUTPUT" | "BIDIRECTIONAL",
-      side: String(formData.get("side")) as "LEFT" | "RIGHT" | "TOP" | "BOTTOM" | "FRONT" | "REAR",
-      sortOrder: Number(formData.get("sortOrder") ?? 0),
-      notes: optionalText(formData.get("notes"))
-    }
+  const quantity = Math.max(1, Math.min(48, Number(formData.get("quantity") ?? 1)));
+  const name = String(formData.get("name") ?? "").trim();
+  const sortOrder = Number(formData.get("sortOrder") ?? 0);
+  const baseData = {
+    productTemplateId,
+    connectorTypeId: String(formData.get("connectorTypeId")),
+    signalTypeId: String(formData.get("signalTypeId")),
+    direction: String(formData.get("direction")) as "INPUT" | "OUTPUT" | "BIDIRECTIONAL",
+    side: String(formData.get("side")) as "LEFT" | "RIGHT" | "TOP" | "BOTTOM" | "FRONT" | "REAR",
+    notes: optionalText(formData.get("notes"))
+  };
+
+  await prisma.productPortTemplate.createMany({
+    data: Array.from({ length: quantity }, (_, index) => ({
+      ...baseData,
+      name: numberedPortName(name, index),
+      sortOrder: sortOrder + index
+    }))
   });
 
   revalidatePath(`/library/products/${productTemplateId}`);

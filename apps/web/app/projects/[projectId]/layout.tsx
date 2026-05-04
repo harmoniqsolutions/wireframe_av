@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Cable, MonitorCog, Network, PackageSearch, Rows3, Settings, SquareStack, type LucideIcon } from "lucide-react";
 import { prisma } from "@wireframe-av/db";
 
-const links = [
-  ["Overview", ""],
-  ["Equipment", "equipment"],
-  ["Schematics", "schematics"],
-  ["Cable Schedule", "cables"],
-  ["Racks", "racks"],
-  ["Settings", "settings"]
+const links: Array<[string, string, LucideIcon]> = [
+  ["Overview", "", SquareStack],
+  ["Equipment", "equipment", PackageSearch],
+  ["Schematics", "schematics", MonitorCog],
+  ["Cable Schedule", "cables", Cable],
+  ["Racks", "racks", Rows3],
+  ["Network", "network", Network],
+  ["Settings", "settings", Settings]
 ];
 
 export const dynamic = "force-dynamic";
@@ -21,23 +23,45 @@ export default async function ProjectLayout({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      _count: {
+        select: {
+          deviceInstances: true,
+          drawingPages: true,
+          cables: true,
+          locations: true
+        }
+      }
+    }
+  });
   if (!project) notFound();
 
   return (
-    <main className="mx-auto grid max-w-7xl grid-cols-[220px_1fr] gap-6 px-6 py-6">
+    <main className="mx-auto grid max-w-7xl grid-cols-[248px_1fr] gap-6 px-6 py-6">
       <aside className="h-fit rounded-md border border-neutral-200 bg-white p-3">
         <div className="border-b border-neutral-200 px-2 pb-3">
-          <p className="text-xs font-medium uppercase text-neutral-500">Project</p>
+          <p className="text-xs font-medium uppercase text-neutral-500">Project Workspace</p>
           <h1 className="mt-1 text-sm font-semibold text-neutral-950">{project.name}</h1>
+          <p className="mt-1 text-xs text-neutral-500">
+            {[project.clientName, project.projectNumber, project.status].filter(Boolean).join(" / ")}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-neutral-500">
+            <span className="rounded border border-neutral-200 bg-neutral-50 px-2 py-1">{project._count.deviceInstances} devices</span>
+            <span className="rounded border border-neutral-200 bg-neutral-50 px-2 py-1">{project._count.cables} cables</span>
+            <span className="rounded border border-neutral-200 bg-neutral-50 px-2 py-1">{project._count.drawingPages} pages</span>
+            <span className="rounded border border-neutral-200 bg-neutral-50 px-2 py-1">{project._count.locations} locations</span>
+          </div>
         </div>
         <nav className="mt-3 space-y-1">
-          {links.map(([label, href]) => (
+          {links.map(([label, href, Icon]) => (
             <Link
               key={href}
               href={`/projects/${projectId}${href ? `/${href}` : ""}`}
-              className="block rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
             >
+              <Icon className="h-4 w-4 text-neutral-500" />
               {label}
             </Link>
           ))}

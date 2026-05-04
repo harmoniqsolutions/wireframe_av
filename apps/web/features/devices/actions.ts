@@ -23,7 +23,7 @@ export async function addDeviceInstanceToProject(projectId: string, formData: Fo
         projectId,
         productTemplateId: template.id,
         locationId: optionalText(formData.get("locationId")),
-        tag: String(formData.get("tag") ?? "").trim(),
+        tag: String(formData.get("tag") ?? "").trim().toUpperCase(),
         displayName: optionalText(formData.get("displayName")),
         notes: optionalText(formData.get("notes"))
       }

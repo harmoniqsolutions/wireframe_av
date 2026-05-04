@@ -95,6 +95,21 @@ function CanvasInner({
     [drawingPageId, setEdges, setMessage]
   );
 
+  const onEdgesDelete = useCallback(
+    (deletedEdges: Edge[]) => {
+      for (const edge of deletedEdges) {
+        fetch(`/api/drawing-edges/${edge.id}`, { method: "DELETE" }).then((response) => {
+          if (!response.ok) {
+            setMessage("Unable to remove the cable for the deleted drawing edge.");
+            return;
+          }
+          setMessage("Cable removed from the project schedule.");
+        });
+      }
+    },
+    [setMessage]
+  );
+
   const persistNode = useCallback((node: Node) => {
     clearTimeout(saveTimers.current[node.id]);
     saveTimers.current[node.id] = setTimeout(() => {
@@ -146,6 +161,7 @@ function CanvasInner({
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onEdgesDelete={onEdgesDelete}
           onConnect={onConnect}
           onNodeDragStop={(_, node) => persistNode(node)}
           fitView
