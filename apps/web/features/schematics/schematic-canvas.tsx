@@ -19,6 +19,7 @@ import {
 import { Maximize2, Minimize2, Plus } from "lucide-react";
 import { useEditorStore } from "@/stores/editor-store";
 import { DeviceNode } from "./device-node";
+import { EditableStepEdge } from "./editable-step-edge";
 
 type SidebarDevice = {
   id: string;
@@ -47,7 +48,56 @@ function CanvasInner({
   const { message, setMessage } = useEditorStore();
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
+  const edgeTypes = useMemo(() => ({ editableStep: EditableStepEdge }), []);
   const placedDeviceIds = new Set(nodes.map((node) => String(node.data.deviceInstanceId)));
+
+  const updateEdgeRoute = useCallback(
+    async (edgeId: string, route: { routeOffsetX: number; routeOffsetY: number }) => {
+      setEdges((current) =>
+        current.map((edge) =>
+          edge.id === edgeId
+            ? {
+                ...edge,
+                type: "editableStep",
+                data: {
+                  ...edge.data,
+                  ...route
+                }
+              }
+            : edge
+        )
+      );
+
+      const response = await fetch(`/api/drawing-edges/${edgeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(route)
+      });
+
+      if (!response.ok) {
+        setMessage("Unable to save cable route adjustment.");
+        return;
+      }
+
+      setMessage("Cable route updated.");
+    },
+    [setEdges, setMessage]
+  );
+
+  const routedEdges = useMemo(
+    () =>
+      edges.map((edge) => ({
+        ...edge,
+        type: "editableStep",
+        data: {
+          routeOffsetX: 0,
+          routeOffsetY: 0,
+          ...edge.data,
+          onRouteChange: updateEdgeRoute
+        }
+      })),
+    [edges, updateEdgeRoute]
+  );
 
   const addDevice = useCallback(
     async (deviceId: string) => {
@@ -91,7 +141,7 @@ function CanvasInner({
         return;
       }
 
-      setEdges((current) => addEdge({ ...payload.edge, type: "default" }, current));
+      setEdges((current) => addEdge({ ...payload.edge, type: "editableStep" }, current));
       setMessage(payload.message);
     },
     [drawingPageId, setEdges, setMessage]
@@ -190,8 +240,9 @@ function CanvasInner({
         </button>
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={routedEdges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onEdgesDelete={onEdgesDelete}

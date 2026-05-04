@@ -29,9 +29,14 @@ export type DiagramNode = {
 
 export type DiagramEdge = {
   id: string;
+  type: "editableStep";
   source: string;
   target: string;
   sourceHandle: string;
   targetHandle: string;
   label?: string;
+  data: {
+    routeOffsetX: number;
+    routeOffsetY: number;
+  };
 };

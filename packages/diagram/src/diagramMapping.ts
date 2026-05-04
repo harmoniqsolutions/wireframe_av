@@ -26,6 +26,8 @@ type DrawingEdgeRecord = {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
+  routeOffsetX: number;
+  routeOffsetY: number;
   cable: {
     cableNumber: string;
     sourceDevicePortId: string;
@@ -63,10 +65,15 @@ export function mapDrawingNodeToReactFlow(node: DrawingNodeRecord): DiagramNode 
 export function mapDrawingEdgeToReactFlow(edge: DrawingEdgeRecord): DiagramEdge {
   return {
     id: edge.id,
+    type: "editableStep",
     source: edge.sourceNodeId,
     target: edge.targetNodeId,
     sourceHandle: edge.cable.sourceDevicePortId,
     targetHandle: edge.cable.destinationDevicePortId,
-    label: edge.cable.cableNumber
+    label: edge.cable.cableNumber,
+    data: {
+      routeOffsetX: edge.routeOffsetX,
+      routeOffsetY: edge.routeOffsetY
+    }
   };
 }

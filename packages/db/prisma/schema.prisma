@@ -348,6 +348,8 @@ model DrawingEdge {
   cableId       String
   sourceNodeId  String
   targetNodeId  String
+  routeOffsetX  Float       @default(0)
+  routeOffsetY  Float       @default(0)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   drawingPage   DrawingPage @relation(fields: [drawingPageId], references: [id], onDelete: Cascade)
