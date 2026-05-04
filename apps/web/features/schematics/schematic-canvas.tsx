@@ -43,9 +43,21 @@ function CanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const { message, setMessage } = useEditorStore();
+  const { message, setMessage: setRawMessage } = useEditorStore();
+
+  const setMessage = useCallback(
+    (msg: string | null) => {
+      setRawMessage(msg);
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+      if (msg !== null) {
+        dismissTimer.current = setTimeout(() => setRawMessage(null), 3000);
+      }
+    },
+    [setRawMessage]
+  );
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
   const edgeTypes = useMemo(() => ({ editableStep: EditableStepEdge }), []);
@@ -250,7 +262,7 @@ function CanvasInner({
           onNodeDragStop={(_, node) => persistNode(node)}
           fitView
         >
-          <Background gap={24} size={1} color="#d4d4d4" />
+          <Background gap={24} size={1} color="hsl(var(--border))" />
           <MiniMap pannable zoomable nodeColor="#737373" />
           <Controls />
         </ReactFlow>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CircuitBoard, FolderKanban } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -9,9 +10,27 @@ export const metadata: Metadata = {
   description: "Structured AV engineering documentation"
 };
 
+const themeScript = `
+(() => {
+  try {
+    const storedTheme = window.localStorage.getItem("wireframe-av-theme");
+    const theme = storedTheme === "light" || storedTheme === "dark"
+      ? storedTheme
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
+  } catch {
+    document.documentElement.style.colorScheme = "light";
+  }
+})();
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>
         <Providers>
           <div className="flex h-screen flex-col overflow-hidden">
@@ -21,15 +40,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <CircuitBoard className="h-5 w-5" />
                   WireframeAV
                 </Link>
-                <nav className="flex items-center gap-1 text-sm">
-                  <Link className="rounded-md px-3 py-2 text-neutral-700 hover:bg-neutral-100" href="/">
-                    <FolderKanban className="mr-2 inline h-4 w-4" />
-                    Projects
-                  </Link>
-                  <Link className="rounded-md px-3 py-2 text-neutral-700 hover:bg-neutral-100" href="/library/products">
-                    Product Library
-                  </Link>
-                </nav>
+                <div className="flex items-center gap-2">
+                  <nav className="flex items-center gap-1 text-sm">
+                    <Link className="rounded-md px-3 py-2 text-neutral-700 hover:bg-neutral-100" href="/">
+                      <FolderKanban className="mr-2 inline h-4 w-4" />
+                      Projects
+                    </Link>
+                    <Link className="rounded-md px-3 py-2 text-neutral-700 hover:bg-neutral-100" href="/library/products">
+                      Product Library
+                    </Link>
+                  </nav>
+                  <ThemeToggle />
+                </div>
               </div>
             </header>
             <div className="min-h-0 flex-1 overflow-auto">{children}</div>

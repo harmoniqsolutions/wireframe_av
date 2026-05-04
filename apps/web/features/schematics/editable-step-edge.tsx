@@ -84,6 +84,7 @@ export function EditableStepEdge({
     y: edgeData.routeOffsetY ?? 0
   });
   const routeOffsetRef = useRef(routeOffset);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     const nextRouteOffset = {
@@ -147,6 +148,15 @@ export function EditableStepEdge({
     [edgeData, id, screenToFlowPosition]
   );
 
+  const resetRoute = useCallback(async () => {
+    const zero = { x: 0, y: 0 };
+    routeOffsetRef.current = zero;
+    setRouteOffset(zero);
+    edgeData.onRouteChange?.(id, { routeOffsetX: 0, routeOffsetY: 0 });
+  }, [edgeData, id]);
+
+  const showControls = selected || hovered;
+
   return (
     <>
       <BaseEdge
@@ -154,31 +164,59 @@ export function EditableStepEdge({
         path={edgePath || fallbackPath}
         markerEnd={markerEnd}
         style={{
-          stroke: selected ? "#171717" : "#525252",
+          stroke: selected ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
           strokeWidth: selected ? 2.5 : 1.75
         }}
       />
       <EdgeLabelRenderer>
         <div
-          className="nodrag nopan absolute rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-neutral-700 shadow-sm"
+          className="nodrag nopan absolute rounded border px-1.5 py-0.5 text-[10px] font-medium shadow-sm transition-all"
           style={{
             transform: `translate(-50%, -50%) translate(${controlPoint.x}px, ${controlPoint.y - 22}px)`,
-            pointerEvents: "all"
+            pointerEvents: "all",
+            borderColor: selected ? "hsl(var(--foreground))" : "hsl(var(--border))",
+            backgroundColor: "hsl(var(--card))",
+            color: selected ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
+            opacity: showControls ? 1 : 0.55
           }}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
         >
           {label}
         </div>
-        <button
-          type="button"
-          onPointerDown={startDrag}
-          className="nodrag nopan absolute h-4 w-4 rounded-sm border border-neutral-700 bg-white shadow-sm transition hover:bg-neutral-100"
-          style={{
-            transform: `translate(-50%, -50%) translate(${controlPoint.x}px, ${controlPoint.y}px)`,
-            pointerEvents: "all"
-          }}
-          aria-label={`Adjust route for ${label ?? "cable"}`}
-          title="Drag to adjust cable route"
-        />
+        {showControls && (
+          <>
+            <button
+              type="button"
+              onPointerDown={startDrag}
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              className="nodrag nopan absolute h-4 w-4 rounded-sm border border-neutral-700 bg-white shadow-sm transition hover:bg-neutral-100"
+              style={{
+                transform: `translate(-50%, -50%) translate(${controlPoint.x}px, ${controlPoint.y}px)`,
+                pointerEvents: "all"
+              }}
+              aria-label={`Adjust route for ${label ?? "cable"}`}
+              title="Drag to adjust cable route"
+            />
+            {(routeOffset.x !== 0 || routeOffset.y !== 0) && (
+              <button
+                type="button"
+                onClick={resetRoute}
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
+                className="nodrag nopan absolute rounded border border-neutral-300 bg-white px-1 py-0.5 text-[9px] text-neutral-500 shadow-sm transition hover:border-neutral-400 hover:text-neutral-700"
+                style={{
+                  transform: `translate(-50%, -50%) translate(${controlPoint.x}px, ${controlPoint.y + 18}px)`,
+                  pointerEvents: "all"
+                }}
+                title="Reset cable route to default"
+              >
+                reset
+              </button>
+            )}
+          </>
+        )}
       </EdgeLabelRenderer>
     </>
   );

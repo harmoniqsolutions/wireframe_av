@@ -126,11 +126,11 @@ main
 
 Recent commits:
 
+- `a673f96 Add agent project handoff`
 - `67547f3 Add editable orthogonal schematic routing`
 - `e3c878c Make schematic workspace fullscreen`
 - `70ce8a2 Loosen connection validation and filter product library`
 - `1d7a574 Improve AV workflow foundation`
-- `4898106 Initial AV documentation MVP`
 
 GitHub CLI was authenticated as `harmoniqsolutions` and `gh auth setup-git` was run so pushes should work.
 
@@ -312,6 +312,7 @@ Implemented:
 - Edges are orthogonal vertical/horizontal routes with rounded corners
 - Edge route handle can be dragged to adjust route
 - Route adjustment persists to `DrawingEdge.routeOffsetX/Y`
+- Port handles only render on LEFT and RIGHT sides (FRONT maps to LEFT, REAR maps to RIGHT); TOP and BOTTOM ports are excluded from the canvas — underlying port data is unchanged
 
 Important files:
 
@@ -322,11 +323,17 @@ Important files:
 - `apps/web/app/api/drawing-pages/[drawingPageId]/nodes/route.ts`
 - `apps/web/app/api/drawing-edges/[drawingEdgeId]/route.ts`
 
+UX improvements landed (2026-05-03):
+
+- Route handle and reset button now only visible when an edge is selected or hovered — reduces visual clutter on busy schematics.
+- “reset” button appears below the drag handle when a route offset is non-zero, zeroes routeOffset and persists via PATCH.
+- Cable number label opacity is reduced (0.55) when edge is not active, full opacity + stronger border/color when selected.
+- Status messages (connection accepted/rejected, cable removed) auto-dismiss after 3 seconds.
+
 Known current UX limitation:
 
 - Manual route control is a single offset/control handle per edge. This is a good MVP but not full multi-segment routing yet.
 - Edge deletion currently deletes the cable. That matches current MVP but may need confirmation UI or soft-delete later.
-- Route adjustment likely needs visual affordances/tooltips and maybe a “reset route” action.
 
 ## Connection Validation Status
 
