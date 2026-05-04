@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
-import { prisma } from "@wireframe-av/db";
+import { Filter, Trash2 } from "lucide-react";
+import { Prisma, prisma } from "@wireframe-av/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,9 +11,36 @@ import { addDeviceInstanceToProject, deleteDeviceInstance } from "@/features/dev
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectEquipmentPage({ params }: { params: Promise<{ projectId: string }> }) {
+export default async function ProjectEquipmentPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ productQ?: string; manufacturerId?: string; category?: string }>;
+}) {
   const { projectId } = await params;
-  const [devices, products, locations] = await Promise.all([
+  const filters = await searchParams;
+  const productQ = filters.productQ?.trim();
+  const selectedManufacturerId = filters.manufacturerId?.trim();
+  const selectedCategory = filters.category?.trim();
+  const productWhere: Prisma.ProductTemplateWhereInput = {
+    AND: [
+      productQ
+        ? {
+            OR: [
+              { name: { contains: productQ, mode: "insensitive" } },
+              { model: { contains: productQ, mode: "insensitive" } },
+              { category: { contains: productQ, mode: "insensitive" } },
+              { manufacturer: { name: { contains: productQ, mode: "insensitive" } } }
+            ]
+          }
+        : {},
+      selectedManufacturerId ? { manufacturerId: selectedManufacturerId } : {},
+      selectedCategory ? { category: selectedCategory } : {}
+    ]
+  };
+
+  const [devices, products, locations, manufacturers, categoryRows] = await Promise.all([
     prisma.deviceInstance.findMany({
       where: { projectId },
       orderBy: { tag: "asc" },
@@ -26,9 +53,21 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
         }
       }
     }),
-    prisma.productTemplate.findMany({ orderBy: { model: "asc" }, include: { manufacturer: true, _count: { select: { ports: true } } } }),
-    prisma.projectLocation.findMany({ where: { projectId }, orderBy: { sortOrder: "asc" } })
+    prisma.productTemplate.findMany({
+      where: productWhere,
+      orderBy: [{ manufacturer: { name: "asc" } }, { model: "asc" }],
+      include: { manufacturer: true, _count: { select: { ports: true } } }
+    }),
+    prisma.projectLocation.findMany({ where: { projectId }, orderBy: { sortOrder: "asc" } }),
+    prisma.manufacturer.findMany({ orderBy: { name: "asc" } }),
+    prisma.productTemplate.findMany({
+      where: { category: { not: null } },
+      select: { category: true },
+      distinct: ["category"],
+      orderBy: { category: "asc" }
+    })
   ]);
+  const categories = categoryRows.map((row) => row.category).filter((category): category is string => Boolean(category));
 
   const addDevice = addDeviceInstanceToProject.bind(null, projectId);
 
@@ -51,11 +90,11 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
             <thead>
               <tr>
                 <Th>Tag</Th>
-                  <Th>Device</Th>
-                  <Th>Category</Th>
-                  <Th>Location</Th>
-                  <Th>Ports</Th>
-                  <Th />
+                <Th>Device</Th>
+                <Th>Category</Th>
+                <Th>Location</Th>
+                <Th>Ports</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
@@ -100,6 +139,41 @@ export default async function ProjectEquipmentPage({ params }: { params: Promise
       </section>
 
       <Panel className="h-fit p-4">
+        <form className="mb-4 space-y-3 border-b border-neutral-200 pb-4" action={`/projects/${projectId}/equipment`}>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-950">
+            <Filter className="h-4 w-4" />
+            Filter Templates
+          </h3>
+          <div className="space-y-2">
+            <Label htmlFor="productQ">Search</Label>
+            <Input id="productQ" name="productQ" defaultValue={productQ ?? ""} placeholder="Biamp, Tesira, DSP" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="manufacturerId">Manufacturer</Label>
+            <Select id="manufacturerId" name="manufacturerId" defaultValue={selectedManufacturerId ?? ""}>
+              <option value="">All manufacturers</option>
+              {manufacturers.map((manufacturer) => (
+                <option key={manufacturer.id} value={manufacturer.id}>
+                  {manufacturer.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="category">Category</Label>
+            <Select id="category" name="category" defaultValue={selectedCategory ?? ""}>
+              <option value="">All categories</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button type="submit" variant="secondary" className="w-full">
+            Apply Filters
+          </Button>
+        </form>
         <form action={addDevice} className="space-y-4">
           <h3 className="text-sm font-semibold text-neutral-950">Add Device</h3>
           {!products.length && (

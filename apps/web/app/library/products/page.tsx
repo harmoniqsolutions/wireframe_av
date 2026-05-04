@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
-import { prisma } from "@wireframe-av/db";
+import { Prisma, VerificationStatus, prisma } from "@wireframe-av/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,23 +13,99 @@ import { verificationStatuses } from "@/lib/enums";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductLibraryPage() {
+export default async function ProductLibraryPage({
+  searchParams
+}: {
+  searchParams: Promise<{ q?: string; manufacturerId?: string; category?: string; verificationStatus?: string }>;
+}) {
   await getCurrentContext();
-  const products = await prisma.productTemplate.findMany({
-    orderBy: [{ manufacturer: { name: "asc" } }, { model: "asc" }],
-    include: {
-      manufacturer: true,
-      _count: { select: { ports: true, deviceInstances: true } }
-    }
-  });
+  const filters = await searchParams;
+  const q = filters.q?.trim();
+  const selectedManufacturerId = filters.manufacturerId?.trim();
+  const selectedCategory = filters.category?.trim();
+  const selectedVerificationStatus = filters.verificationStatus?.trim();
+  const where: Prisma.ProductTemplateWhereInput = {
+    AND: [
+      q
+        ? {
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { model: { contains: q, mode: "insensitive" } },
+              { category: { contains: q, mode: "insensitive" } },
+              { manufacturer: { name: { contains: q, mode: "insensitive" } } }
+            ]
+          }
+        : {},
+      selectedManufacturerId ? { manufacturerId: selectedManufacturerId } : {},
+      selectedCategory ? { category: selectedCategory } : {},
+      selectedVerificationStatus ? { verificationStatus: selectedVerificationStatus as VerificationStatus } : {}
+    ]
+  };
+
+  const [products, manufacturers, categoryRows] = await Promise.all([
+    prisma.productTemplate.findMany({
+      where,
+      orderBy: [{ manufacturer: { name: "asc" } }, { model: "asc" }],
+      include: {
+        manufacturer: true,
+        _count: { select: { ports: true, deviceInstances: true } }
+      }
+    }),
+    prisma.manufacturer.findMany({ orderBy: { name: "asc" } }),
+    prisma.productTemplate.findMany({
+      where: { category: { not: null } },
+      select: { category: true },
+      distinct: ["category"],
+      orderBy: { category: "asc" }
+    })
+  ]);
+  const categories = categoryRows.map((row) => row.category).filter((category): category is string => Boolean(category));
 
   return (
     <main className="mx-auto grid max-w-7xl grid-cols-[1fr_380px] gap-6 px-6 py-8">
       <section>
-        <div className="mb-5">
-          <h1 className="text-2xl font-semibold text-neutral-950">Product Library</h1>
-          <p className="mt-1 text-sm text-neutral-500">Reusable manufacturer templates. Project devices snapshot their ports on creation.</p>
+        <div className="mb-5 flex items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-neutral-950">Product Library</h1>
+            <p className="mt-1 text-sm text-neutral-500">Reusable manufacturer templates. Project devices snapshot their ports on creation.</p>
+          </div>
+          <div className="text-right text-xs text-neutral-500">
+            <div className="font-medium text-neutral-700">{products.length} visible templates</div>
+            <div>{manufacturers.length} manufacturers</div>
+          </div>
         </div>
+        <Panel className="mb-4 p-3">
+          <form className="grid grid-cols-[1.4fr_1fr_1fr_1fr_auto] gap-2" action="/library/products">
+            <Input name="q" defaultValue={q ?? ""} placeholder="Search manufacturer, model, name" aria-label="Search products" />
+            <Select name="manufacturerId" defaultValue={selectedManufacturerId ?? ""} aria-label="Filter by manufacturer">
+              <option value="">All manufacturers</option>
+              {manufacturers.map((manufacturer) => (
+                <option key={manufacturer.id} value={manufacturer.id}>
+                  {manufacturer.name}
+                </option>
+              ))}
+            </Select>
+            <Select name="category" defaultValue={selectedCategory ?? ""} aria-label="Filter by category">
+              <option value="">All categories</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </Select>
+            <Select name="verificationStatus" defaultValue={selectedVerificationStatus ?? ""} aria-label="Filter by verification status">
+              <option value="">All verification</option>
+              {verificationStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status.replaceAll("_", " ")}
+                </option>
+              ))}
+            </Select>
+            <Button type="submit" variant="secondary">
+              Filter
+            </Button>
+          </form>
+        </Panel>
         <div className="space-y-3">
           {products.map((product) => (
             <Link

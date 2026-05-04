@@ -146,8 +146,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ dr
 
   return NextResponse.json({
     allowed: true,
-    severity: "success",
-    message: "Cable created.",
+    severity: result.severity,
+    message: result.severity === "warning" ? `Cable created with warning. ${result.message}` : "Cable created.",
     edge: mapDrawingEdgeToReactFlow(edge)
   });
 }
